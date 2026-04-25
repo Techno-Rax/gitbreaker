@@ -141,7 +141,9 @@ class Game {
         document.getElementById('demo-btn')?.addEventListener('click', () => {
             this.sound.init();
             this.username = 'demo';
-            this._startGame(generateDemoGrid(), true);
+            import('./grid.js').then(m => {
+                this._startGame(m.generateDemoGrid().years, true);
+            });
         });
 
         // --- Export Feature ---
@@ -179,6 +181,16 @@ class Game {
 
         document.getElementById('restart-btn')?.addEventListener('click', () => this._restartGame());
         document.getElementById('win-restart-btn')?.addEventListener('click', () => this._restartGame());
+        
+        const returnToHome = () => {
+            this.state = State.START;
+            UI.showScreen('start-screen');
+            UI.setStatus('ready');
+        };
+        document.getElementById('home-btn-go')?.addEventListener('click', returnToHome);
+        document.getElementById('home-btn-win')?.addEventListener('click', returnToHome);
+        document.getElementById('home-btn-pause')?.addEventListener('click', returnToHome);
+
         document.getElementById('resume-btn')?.addEventListener('click', () => {
             this.state = State.PLAYING;
             UI.hideAllScreens();
@@ -472,12 +484,16 @@ class Game {
                         return;
                     }
 
-                    // Reset to single ball
+                    // Reset to single ball with a short delay
                     this.balls = [];
-                    const nb = this.createBall();
-                    nb.gravity = this.baseGravity;
-                    nb.attachTo(this.paddle, this.gravityDir);
-                    this.balls.push(nb);
+                    setTimeout(() => {
+                        if (this.state === State.PLAYING) {
+                            const nb = this.createBall();
+                            nb.gravity = this.baseGravity;
+                            nb.attachTo(this.paddle, this.gravityDir);
+                            this.balls.push(nb);
+                        }
+                    }, 800);
                 }
             }
 

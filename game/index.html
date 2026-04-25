@@ -116,9 +116,14 @@
                             <span class="stat-label">combo</span>
                         </div>
                     </div>
-                    <button id="restart-btn" class="btn btn-primary">
-                        <span class="btn-text">↻ respawn</span>
-                    </button>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="restart-btn" class="btn btn-primary" style="flex: 1;">
+                            <span class="btn-text">↻ respawn</span>
+                        </button>
+                        <button id="home-btn-go" class="btn btn-secondary" style="flex: 1;">
+                            <span class="btn-text">🏠 home</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -137,9 +142,14 @@
                             <span class="stat-label">time</span>
                         </div>
                     </div>
-                    <button id="win-restart-btn" class="btn btn-primary">
-                        <span class="btn-text">↻ play again</span>
-                    </button>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="win-restart-btn" class="btn btn-primary" style="flex: 1;">
+                            <span class="btn-text">↻ play again</span>
+                        </button>
+                        <button id="home-btn-win" class="btn btn-secondary" style="flex: 1;">
+                            <span class="btn-text">🏠 home</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -147,9 +157,14 @@
             <div id="pause-screen" class="overlay hidden">
                 <div class="overlay-content">
                     <h2 class="pause-title">paused</h2>
-                    <button id="resume-btn" class="btn btn-primary">
-                        <span class="btn-text">▶ resume</span>
-                    </button>
+                    <div style="display: flex; gap: 10px; justify-content: center;">
+                        <button id="resume-btn" class="btn btn-primary" style="flex: 1;">
+                            <span class="btn-text">▶ resume</span>
+                        </button>
+                        <button id="home-btn-pause" class="btn btn-secondary" style="flex: 1;">
+                            <span class="btn-text">🏠 home</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 

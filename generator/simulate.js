@@ -76,22 +76,7 @@ export function simulate(grids, options = {}) {
         for (let frame = 0; frame < framesPerLevel; frame++) {
             const brickChanges = [];
 
-            if (bricksDestroyed < totalBricks) {
-                const dropSpeedBase = 10 + (frame / framesPerLevel) * 30; 
-                let closestDist = 9999;
-                for (const brick of bricks) {
-                    if (!brick.alive) continue;
-                    const dist = paddleY - (brick.y + brick.h);
-                    if (dist < closestDist) closestDist = dist;
-                }
-
-                let actualSpeed = dropSpeedBase;
-                if (closestDist < 80) actualSpeed *= Math.max(0.01, (closestDist - 15) / 65); 
-                
-                const dy = actualSpeed * dt;
-                topPadding += dy;
-                for (const brick of bricks) { brick.y += dy; }
-            }
+            // Bricks no longer descend
 
             if (frame > framesPerLevel * 0.4) {
                 speed *= 1.05; 
