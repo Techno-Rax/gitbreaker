@@ -23,8 +23,9 @@ export async function fetchContributions(username) {
     for (const strategy of strategies) {
         try {
             const result = await strategy();
-            if (result && result.grid && result.grid.length > 0) {
-                return result;
+            const normalized = normalizeContributionResult(result);
+            if (normalized) {
+                return normalized;
             }
         } catch (err) {
             console.warn('Fetch strategy failed:', err.message);
@@ -77,17 +78,39 @@ async function fetchFromProxy(username) {
         const data = await response.json();
 
         // New V2.3 format with years array
-        if (data.years && data.years.length > 0) {
+        if (Array.isArray(data.years) && data.years.length > 0) {
+            const years = [];
+            for (const entry of data.years) {
+                if (!entry) continue;
+
+                let yearGrid = entry.grid;
+                if (!isValidGrid(yearGrid) && Array.isArray(entry.weeks) && entry.weeks.length > 0) {
+                    const converted = weeksToGrid(entry.weeks);
+                    yearGrid = Array.isArray(converted?.grid) ? converted.grid : converted;
+                }
+
+                if (!isValidGrid(yearGrid)) continue;
+
+                years.push({
+                    year: entry.year,
+                    grid: yearGrid,
+                    totalContributions: entry.totalContributions || countTotal(yearGrid),
+                });
+            }
+
+            const fallbackGrid = isValidGrid(data.grid) ? data.grid : pickPrimaryGrid(years);
             return {
-                grid: data.grid,
-                totalContributions: data.totalAllTime || countTotal(data.grid),
-                years: data.years
+                grid: fallbackGrid,
+                totalContributions: data.totalContributions || countTotal(fallbackGrid || []),
+                years,
+                totalAllTime: data.totalAllTime,
             };
         }
 
         // Backward compatibility
         if (data.weeks) {
-            const grid = weeksToGrid(data.weeks);
+            const converted = weeksToGrid(data.weeks);
+            const grid = Array.isArray(converted?.grid) ? converted.grid : converted;
             return {
                 grid,
                 totalContributions: data.totalContributions || 0,
@@ -167,4 +190,55 @@ function countTotal(grid) {
         }
     }
     return total;
+}
+
+function isValidGrid(grid) {
+    return Array.isArray(grid) && grid.length > 0 && grid.every(row => Array.isArray(row));
+}
+
+function pickPrimaryGrid(years) {
+    if (!Array.isArray(years)) return null;
+
+    for (const year of years) {
+        if (isValidGrid(year?.grid) && countTotal(year.grid) > 0) {
+            return year.grid;
+        }
+    }
+
+    for (const year of years) {
+        if (isValidGrid(year?.grid)) {
+            return year.grid;
+        }
+    }
+
+    return null;
+}
+
+function normalizeContributionResult(result) {
+    if (!result) return null;
+
+    const years = Array.isArray(result.years)
+        ? result.years.filter(y => isValidGrid(y?.grid))
+        : [];
+
+    let grid = isValidGrid(result.grid) ? result.grid : pickPrimaryGrid(years);
+    if (!isValidGrid(grid)) {
+        return null;
+    }
+
+    const safeYears = years.length > 0
+        ? years
+        : [{ year: new Date().getFullYear(), grid, totalContributions: countTotal(grid) }];
+
+    const totalAllTime = result.totalAllTime || safeYears.reduce((acc, y) => {
+        const value = Number(y.totalContributions);
+        return acc + (Number.isFinite(value) ? value : countTotal(y.grid));
+    }, 0);
+
+    return {
+        grid,
+        years: safeYears,
+        totalContributions: result.totalContributions || countTotal(grid),
+        totalAllTime,
+    };
 }

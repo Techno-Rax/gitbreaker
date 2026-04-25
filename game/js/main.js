@@ -149,11 +149,27 @@ class Game {
         // --- Export Feature ---
         const updateExportCode = () => {
             const theme = document.getElementById('export-theme').value;
+            const size = document.getElementById('export-size').value;
+            const customSizeContainer = document.getElementById('export-custom-size');
+            const widthInput = document.getElementById('export-width');
+            const heightInput = document.getElementById('export-height');
             const domain = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
                 ? 'https://gitbreaker.vercel.app' 
                 : window.location.origin;
             const user = this.username && this.username !== 'demo' ? this.username : 'techno-rax';
-            const code = `[![CommitBreaker](${domain}/api/svg?user=${user}&theme=${theme})](https://techno-rax.github.io/gitbreaker/)`;
+
+            let query = `user=${encodeURIComponent(user)}&theme=${encodeURIComponent(theme)}`;
+            if (size === 'custom') {
+                customSizeContainer.classList.remove('hidden');
+                const width = Math.min(1600, Math.max(640, parseInt(widthInput.value, 10) || 960));
+                const height = Math.min(320, Math.max(140, parseInt(heightInput.value, 10) || 170));
+                query += `&width=${width}&height=${height}`;
+            } else {
+                customSizeContainer.classList.add('hidden');
+                query += `&size=${encodeURIComponent(size)}`;
+            }
+
+            const code = `[![CommitBreaker](${domain}/api/svg?${query})](https://techno-rax.github.io/gitbreaker/)`;
             document.getElementById('export-code').value = code;
         };
 
@@ -167,6 +183,9 @@ class Game {
         });
 
         document.getElementById('export-theme')?.addEventListener('change', updateExportCode);
+        document.getElementById('export-size')?.addEventListener('change', updateExportCode);
+        document.getElementById('export-width')?.addEventListener('input', updateExportCode);
+        document.getElementById('export-height')?.addEventListener('input', updateExportCode);
 
         document.getElementById('copy-export-btn')?.addEventListener('click', () => {
             const codeEl = document.getElementById('export-code');
@@ -183,7 +202,7 @@ class Game {
         document.getElementById('win-restart-btn')?.addEventListener('click', () => this._restartGame());
         
         const returnToHome = () => {
-            this.state = State.START;
+            this.state = State.MENU;
             UI.showScreen('start-screen');
             UI.setStatus('ready');
         };
@@ -297,13 +316,23 @@ class Game {
         UI.setStatus('running');
 
         // Ping-pong timeline sequence
-        this.yearsData = yearsData || [{ year: new Date().getFullYear(), grid: generateDemoGrid().years[0].grid }];
+        this.yearsData = this._normalizeYearsData(yearsData);
+        if (this.yearsData.length === 0) {
+            this.yearsData = this._normalizeYearsData(generateDemoGrid().years);
+        }
+
         this.levelSequence = [];
         for (let i = 0; i < this.yearsData.length; i++) this.levelSequence.push(i);
         for (let i = this.yearsData.length - 2; i > 0; i--) this.levelSequence.push(i);
         if (this.levelSequence.length === 0) this.levelSequence.push(0);
 
-        this.currentSeqIndex = 0;
+        this.currentSeqIndex = this._findNextPlayableSeqIndex(0);
+        if (this.currentSeqIndex < 0) {
+            if (!this._fallbackToDemo('No playable heatmap data; switched to demo mode')) {
+                return;
+            }
+            return;
+        }
 
         // Reset
         this.score = 0;
@@ -342,9 +371,30 @@ class Game {
     }
 
     _loadLevel(seqIndex, isHpData) {
+        if (seqIndex < 0 || seqIndex >= this.levelSequence.length) {
+            if (!this._fallbackToDemo('No playable year available')) {
+                this.state = State.GAME_OVER;
+            }
+            return;
+        }
+
         const gridIndex = this.levelSequence[seqIndex];
         const yearData = this.yearsData[gridIndex];
-        const gridData = yearData.grid;
+        const gridData = yearData?.grid;
+
+        if (!this._hasPlayableGrid(gridData)) {
+            const nextPlayable = this._findNextPlayableSeqIndex(seqIndex + 1);
+            if (nextPlayable >= 0) {
+                this.currentSeqIndex = nextPlayable;
+                this._loadLevel(nextPlayable, isHpData);
+                return;
+            }
+
+            if (!this._fallbackToDemo('No playable years found; switched to demo mode')) {
+                this.state = State.GAME_OVER;
+            }
+            return;
+        }
 
         // Reset ball
         this.balls = [];
@@ -365,7 +415,79 @@ class Game {
         this.totalBricks = this.bricks.length;
         this.bricksDestroyedCount = 0;
 
+        if (this.totalBricks === 0) {
+            const nextPlayable = this._findNextPlayableSeqIndex(seqIndex + 1);
+            if (nextPlayable >= 0) {
+                this.currentSeqIndex = nextPlayable;
+                this._loadLevel(nextPlayable, isHpData);
+                return;
+            }
+
+            if (!this._fallbackToDemo('Heatmap contains no breakable bricks; switched to demo mode')) {
+                this.state = State.GAME_OVER;
+            }
+            return;
+        }
+
         UI.setStatus(`Year: ${yearData.year}`);
+    }
+
+    _normalizeYearsData(yearsData) {
+        if (!Array.isArray(yearsData)) return [];
+
+        const normalized = [];
+        for (const yearEntry of yearsData) {
+            if (!yearEntry) continue;
+            const grid = yearEntry.grid;
+            if (!Array.isArray(grid) || grid.length === 0 || !grid.every(row => Array.isArray(row))) {
+                continue;
+            }
+
+            normalized.push({
+                year: yearEntry.year || new Date().getFullYear(),
+                grid,
+                totalContributions: yearEntry.totalContributions || 0,
+            });
+        }
+
+        return normalized;
+    }
+
+    _hasPlayableGrid(grid) {
+        if (!Array.isArray(grid) || grid.length === 0) return false;
+        for (const row of grid) {
+            if (!Array.isArray(row)) continue;
+            for (const value of row) {
+                if (value > 0) return true;
+            }
+        }
+        return false;
+    }
+
+    _findNextPlayableSeqIndex(startSeqIndex) {
+        for (let i = startSeqIndex; i < this.levelSequence.length; i++) {
+            const levelIndex = this.levelSequence[i];
+            const yearData = this.yearsData[levelIndex];
+            if (this._hasPlayableGrid(yearData?.grid)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    _fallbackToDemo(statusMessage) {
+        if (this.username === 'demo') {
+            UI.setStatus(statusMessage || 'No playable heatmap data');
+            UI.showScreen('start-screen');
+            this.state = State.MENU;
+            return false;
+        }
+
+        this.username = 'demo';
+        UI.setStatus(statusMessage || 'Switching to demo mode');
+        const demo = generateDemoGrid();
+        this._startGame(demo.years, true);
+        return true;
     }
     createBall() {
         return new Ball(this.canvas.width / 2, this.canvas.height - 50, 5);

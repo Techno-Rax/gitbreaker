@@ -9,6 +9,8 @@ const THEMES = {
     'github-dark': {
         bg: '#0d1117',
         lines: 'rgba(255,255,255,0.02)',
+        watermarkRgb: '201,209,217',
+        watermarkOpacity: 0.1,
         text: '#c9d1d9',
         accent: '#58a6ff',
         paddle: '#58a6ff',
@@ -18,6 +20,8 @@ const THEMES = {
     'github-light': {
         bg: '#ffffff',
         lines: 'rgba(0,0,0,0.03)',
+        watermarkRgb: '36,41,47',
+        watermarkOpacity: 0.12,
         text: '#24292f',
         accent: '#0969da',
         paddle: '#0969da',
@@ -27,6 +31,8 @@ const THEMES = {
     'dracula': {
         bg: '#282a36',
         lines: 'rgba(255,255,255,0.03)',
+        watermarkRgb: '248,248,242',
+        watermarkOpacity: 0.11,
         text: '#f8f8f2',
         accent: '#bd93f9',
         paddle: '#bd93f9',
@@ -36,6 +42,8 @@ const THEMES = {
     'outrun': {
         bg: '#0a0a2a',
         lines: 'rgba(0,255,255,0.05)',
+        watermarkRgb: '0,255,255',
+        watermarkOpacity: 0.12,
         text: '#00ffff',
         accent: '#ff00ff',
         paddle: '#ff00ff',
@@ -45,7 +53,7 @@ const THEMES = {
 };
 
 export function renderSVG(simResult, width, height, grids, options = {}) {
-    const { fps = 30, username = '', theme = 'github-dark', compact = false } = options;
+    const { fps = 30, username = '', theme = 'github-dark', compact = false, watermarkOpacity } = options;
     const { frames, levelSequence, brickLayout } = simResult;
     const { rows, cols, brickW, brickH, brickGap, startX } = brickLayout;
 
@@ -54,6 +62,11 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
     const ballR = 5;
     const paddleH = 10;
     const paddleY = height - 25;
+    const effectiveWatermarkOpacity = Number.isFinite(watermarkOpacity)
+        ? Math.max(0.04, Math.min(0.35, watermarkOpacity))
+        : t.watermarkOpacity;
+    const watermarkFill = `rgba(${t.watermarkRgb},${effectiveWatermarkOpacity})`;
+    const yearFontSize = Math.max(34, Math.min(92, Math.round(Math.min(width * 0.1, height * 0.55))));
 
     // Track brick hits by absolute ID for destruction animations
     const brickEvents = new Map(); 
@@ -140,7 +153,7 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
     for (let x = 0; x < width; x += 40) svg += `  <line x1="${x}" y1="0" x2="${x}" y2="${height}" stroke="${t.lines}" stroke-width="1"/>\n`;
     for (let y = 0; y < height; y += 40) svg += `  <line x1="0" y1="${y}" x2="${width}" y2="${y}" stroke="${t.lines}" stroke-width="1"/>\n`;
 
-    const tPad = 15;
+    const tPad = compact ? 12 : 15;
 
     // Render every ping-pong level iteration in its own sliding group
     for (let seqIndex = 0; seqIndex < levelSequence.length; seqIndex++) {
@@ -156,7 +169,7 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
         // We didn't pass the actual 'year' strings to renderSVG. Let's just calculate it: Since max is 5, it's roughly currentYear - gridIndex.
         const currentY = new Date().getFullYear();
         const yearText = currentY - gridIndex;
-        svg += `    <text x="${width/2}" y="${height/2 + 20}" font-family="sans-serif" font-size="80" font-weight="800" text-anchor="middle" fill="${t.lines}" style="pointer-events: none;">${yearText}</text>\n`;
+        svg += `    <text x="${width/2}" y="${height/2 + yearFontSize * 0.25}" font-family="sans-serif" font-size="${yearFontSize}" font-weight="800" text-anchor="middle" fill="${watermarkFill}" style="pointer-events: none;">${yearText}</text>\n`;
 
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {

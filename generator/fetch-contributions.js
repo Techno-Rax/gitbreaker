@@ -140,20 +140,44 @@ function weeksToGrid(weeks) {
  * @returns {number[][]}
  */
 export function generateDemoGrid() {
-    function generateSingleYear(y) {
+    function shuffle(array) {
+        const clone = [...array];
+        for (let i = clone.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [clone[i], clone[j]] = [clone[j], clone[i]];
+        }
+        return clone;
+    }
+
+    function countWeightedContributions(grid) {
+        const hpWeight = { 1: 2, 2: 6, 3: 11, 4: 17 };
+        let total = 0;
+        for (const row of grid) {
+            for (const hp of row) {
+                total += hpWeight[hp] || 0;
+            }
+        }
+        return total;
+    }
+
+    function generateSingleYear(y, profile) {
         const grid = [];
         for (let row = 0; row < 7; row++) {
             const rowData = [];
             for (let col = 0; col < 52; col++) {
-                const r = Math.random();
-                const dayFactor = (row === 0 || row === 6) ? 0.6 : 1;
-                const timeFactor = Math.sin((col / 52) * Math.PI * 2 + (y * 0.5)) * 0.4 + 0.6;
-                const p = r * dayFactor * timeFactor;
+                const dayFactor = (row === 0 || row === 6) ? profile.weekendWeight : 1;
+                const season = Math.sin((col / 52) * Math.PI * 2 + profile.phase + y * 0.11) * profile.seasonAmp + profile.seasonBias;
+                const streak = (col >= profile.streakStart && col <= profile.streakEnd) ? profile.streakBoost : 1;
+                const burst = Math.random() < profile.burstChance ? profile.burstBoost : 1;
+                const noise = 0.72 + Math.random() * 0.58;
+                const p = noise * dayFactor * season * streak * burst;
+
                 let hp = 0;
-                if (p > 0.8) hp = 4;
-                else if (p > 0.6) hp = 3;
-                else if (p > 0.4) hp = 2;
-                else if (p > 0.2) hp = 1;
+                if (p > 1.08) hp = 4;
+                else if (p > 0.86) hp = 3;
+                else if (p > 0.62) hp = 2;
+                else if (p > 0.38) hp = 1;
+
                 rowData.push(hp);
             }
             grid.push(rowData);
@@ -161,21 +185,34 @@ export function generateDemoGrid() {
         return grid;
     }
 
+    const profilePool = shuffle([
+        { weekendWeight: 0.52, seasonAmp: 0.33, seasonBias: 0.52, streakStart: 8, streakEnd: 18, streakBoost: 1.18, burstChance: 0.05, burstBoost: 1.14, phase: Math.random() * Math.PI * 2 },
+        { weekendWeight: 0.66, seasonAmp: 0.4, seasonBias: 0.62, streakStart: 19, streakEnd: 33, streakBoost: 1.34, burstChance: 0.08, burstBoost: 1.23, phase: Math.random() * Math.PI * 2 },
+        { weekendWeight: 0.74, seasonAmp: 0.47, seasonBias: 0.7, streakStart: 30, streakEnd: 42, streakBoost: 1.42, burstChance: 0.11, burstBoost: 1.32, phase: Math.random() * Math.PI * 2 },
+        { weekendWeight: 0.58, seasonAmp: 0.36, seasonBias: 0.58, streakStart: 12, streakEnd: 24, streakBoost: 1.24, burstChance: 0.06, burstBoost: 1.18, phase: Math.random() * Math.PI * 2 },
+        { weekendWeight: 0.69, seasonAmp: 0.44, seasonBias: 0.66, streakStart: 24, streakEnd: 40, streakBoost: 1.38, burstChance: 0.09, burstBoost: 1.27, phase: Math.random() * Math.PI * 2 },
+    ]);
+
     const currentYear = new Date().getFullYear();
     const yearsData = [];
     for (let i = 0; i < 5; i++) {
+        const profile = profilePool[i % profilePool.length];
+        const year = currentYear - i;
+        const grid = generateSingleYear(year, profile);
         yearsData.push({
-            year: currentYear - i,
-            totalContributions: 800 - i * 50,
-            grid: generateSingleYear(currentYear - i)
+            year,
+            totalContributions: countWeightedContributions(grid),
+            grid,
         });
     }
+
+    const totalAllTime = yearsData.reduce((sum, y) => sum + y.totalContributions, 0);
 
     return { 
         grid: yearsData[0].grid, 
         totalContributions: yearsData[0].totalContributions,
         years: yearsData,
-        totalAllTime: 3500
+        totalAllTime,
     };
 }
 

@@ -4,12 +4,12 @@ export function simulate(grids, options = {}) {
         height = 340,
         framesPerLevel = 200,
         fps = 30,
+        sidePadding = 0,
     } = options;
 
     const dt = 1 / fps;
-    const brickW = 11;
-    const brickH = 11;
-    const brickGap = 2;
+    let brickW = 11;
+    let brickGap = width < 760 ? 1 : 2;
     const gridPadding = 16;
     const topPaddingBase = 15;
 
@@ -38,8 +38,22 @@ export function simulate(grids, options = {}) {
     // We also need to return layout info
     const cols = grids[0]?.[0]?.length || 52;
     const rows = 7;
+
+    // Scale brick size down for narrower presets while preserving a minimum side gutter.
+    const requestedSidePadding = Math.max(0, Math.floor(sidePadding));
+    const availableWidth = Math.max(360, width - requestedSidePadding * 2);
+    while (brickW > 7 && (brickW * cols + (cols - 1) * brickGap) > availableWidth) {
+        brickW -= 1;
+    }
+    if ((brickW * cols + (cols - 1) * brickGap) > availableWidth && brickGap > 1) {
+        brickGap = 1;
+    }
+
+    const brickH = brickW;
     const totalWidth = cols * brickW + (cols - 1) * brickGap;
-    const startX = (width - totalWidth) / 2;
+    const maxSidePadding = Math.max(0, Math.floor((width - totalWidth) / 2));
+    const effectiveSidePadding = Math.min(requestedSidePadding, maxSidePadding);
+    const startX = effectiveSidePadding + Math.max(0, (width - effectiveSidePadding * 2 - totalWidth) / 2);
 
     for (let seqIndex = 0; seqIndex < levelSequence.length; seqIndex++) {
         const gridIndex = levelSequence[seqIndex];
@@ -78,7 +92,7 @@ export function simulate(grids, options = {}) {
 
             // Bricks no longer descend
 
-            if (frame > framesPerLevel * 0.4) {
+            if (frame > framesPerLevel * 0.3) {
                 speed = baseSpeed * 1.5; 
             }
             const piercingMode = frame > (framesPerLevel * 0.8) && bricksDestroyed < totalBricks;
@@ -91,13 +105,15 @@ export function simulate(grids, options = {}) {
                 ballY += ballDy * subDt;
 
                 const targetPaddleX = ballX - paddleW / 2;
-                // Add some smooth wandering that stays within the paddle width bounds to look less robotic
-                const wander = Math.sin(frame * 0.15) * (paddleW * 0.3) + Math.cos(frame * 0.05) * (paddleW * 0.1);
+                // Add smooth + pseudo-random wander so the paddle feels less robotic.
+                const waveWander = Math.sin(frame * 0.22) * (paddleW * 0.5) + Math.cos(frame * 0.08) * (paddleW * 0.25);
+                const jitter = (Math.sin((frame + 1) * (s + 3) * 0.37) + Math.cos((frame + 11) * 0.19)) * (paddleW * 0.12);
+                const wander = waveWander + jitter;
                 
                 // Snap closer if ball is dangerously close
-                const danger = Math.max(0, 1 - (paddleY - ballY) / 60);
+                const danger = Math.max(0, 1 - (paddleY - ballY) / 45);
                 
-                paddleX += (targetPaddleX + wander * (1 - danger) - paddleX) * 0.3;
+                paddleX += (targetPaddleX + wander * (1 - danger * 0.9) - paddleX) * 0.22;
                 paddleX = Math.max(0, Math.min(width - paddleW, paddleX));
 
                 if (ballX - ballR <= 0) { ballX = ballR; ballDx = Math.abs(ballDx); }
@@ -107,7 +123,7 @@ export function simulate(grids, options = {}) {
                 if (ballY + ballR >= paddleY) {
                     ballY = paddleY - ballR - 1;
                     const hitPos = (ballX - paddleX) / paddleW;
-                    const reflectAngle = -Math.PI / 2 + (hitPos - 0.5) * 2 * (Math.PI / 3) + (Math.random() - 0.5) * 0.1;
+                    const reflectAngle = -Math.PI / 2 + (hitPos - 0.5) * 2 * (Math.PI / 3) + (Math.random() - 0.5) * 0.2;
                     ballDx = Math.cos(reflectAngle) * speed;
                     ballDy = -Math.abs(Math.sin(reflectAngle) * speed); 
                 }
@@ -164,6 +180,16 @@ export function simulate(grids, options = {}) {
         frames,
         levelSequence,
         finalScore: totalScore,
-        brickLayout: { rows, cols, brickW, brickH, brickGap, gridPadding: 16, topPaddingBase, startX },
+        brickLayout: {
+            rows,
+            cols,
+            brickW,
+            brickH,
+            brickGap,
+            gridPadding,
+            topPaddingBase,
+            startX,
+            sidePadding: effectiveSidePadding,
+        },
     };
 }
