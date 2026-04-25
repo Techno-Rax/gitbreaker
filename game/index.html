@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="description" content="GitBreaker — Smash your GitHub contribution heatmap in this brick breaker game!">
+    <meta name="theme-color" content="#0a0e27">
+    <title>GitBreaker — Contribution Brick Breaker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="game-wrapper">
+        <!-- Start Screen -->
+        <div id="start-screen" class="overlay">
+            <div class="overlay-content">
+                <h1 class="game-title">
+                    <span class="title-git">Git</span><span class="title-breaker">Breaker</span>
+                </h1>
+                <p class="tagline">Smash your GitHub contributions</p>
+
+                <div class="input-group">
+                    <label for="username-input">GitHub Username</label>
+                    <div class="input-wrapper">
+                        <svg class="input-icon" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                        </svg>
+                        <input type="text" id="username-input" placeholder="anoojshete" value="anoojshete" autocomplete="off" spellcheck="false">
+                    </div>
+                </div>
+
+                <button id="play-btn" class="btn btn-primary">
+                    <span class="btn-text">▶ Play</span>
+                    <span class="btn-glow"></span>
+                </button>
+                <button id="demo-btn" class="btn btn-secondary">Demo Mode</button>
+
+                <div class="controls-hint">
+                    <span>🖱️ Mouse</span>
+                    <span>⌨️ Arrow Keys</span>
+                    <span>📱 Touch</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameover-screen" class="overlay hidden">
+            <div class="overlay-content">
+                <h2 class="gameover-title">Game Over</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-value" id="final-score">0</span>
+                        <span class="stat-label">Score</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="bricks-destroyed">0</span>
+                        <span class="stat-label">Bricks Smashed</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="max-combo">0</span>
+                        <span class="stat-label">Max Combo</span>
+                    </div>
+                </div>
+                <button id="restart-btn" class="btn btn-primary">
+                    <span class="btn-text">↻ Play Again</span>
+                    <span class="btn-glow"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Win Screen -->
+        <div id="win-screen" class="overlay hidden">
+            <div class="overlay-content">
+                <h2 class="win-title">🎉 You Win!</h2>
+                <p class="win-subtitle">All contributions smashed!</p>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-value" id="win-score">0</span>
+                        <span class="stat-label">Final Score</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="win-time">0:00</span>
+                        <span class="stat-label">Time</span>
+                    </div>
+                </div>
+                <button id="win-restart-btn" class="btn btn-primary">
+                    <span class="btn-text">↻ Play Again</span>
+                    <span class="btn-glow"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Pause Overlay -->
+        <div id="pause-screen" class="overlay hidden">
+            <div class="overlay-content">
+                <h2 class="pause-title">⏸ Paused</h2>
+                <button id="resume-btn" class="btn btn-primary">
+                    <span class="btn-text">▶ Resume</span>
+                    <span class="btn-glow"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading-screen" class="overlay hidden">
+            <div class="overlay-content">
+                <div class="loader"></div>
+                <p class="loading-text">Fetching contributions...</p>
+            </div>
+        </div>
+
+        <!-- HUD -->
+        <div id="hud" class="hidden">
+            <div class="hud-left">
+                <span class="hud-label">SCORE</span>
+                <span class="hud-value" id="hud-score">0</span>
+            </div>
+            <div class="hud-center">
+                <span class="hud-label" id="hud-username">anoojshete</span>
+                <span class="hud-combo hidden" id="hud-combo">x1</span>
+            </div>
+            <div class="hud-right">
+                <span class="hud-label">LIVES</span>
+                <span class="hud-value" id="hud-lives">❤️❤️❤️</span>
+            </div>
+        </div>
+
+        <!-- Canvas -->
+        <canvas id="game-canvas"></canvas>
+
+        <!-- Sound Toggle -->
+        <button id="sound-toggle" class="sound-btn" title="Toggle Sound">🔊</button>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

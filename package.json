@@ -1,0 +1,17 @@
+{
+  "name": "gitbreaker",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Brick Breaker game powered by your GitHub contribution heatmap",
+  "private": true,
+  "scripts": {
+    "generate": "node generator/generate.js",
+    "fetch": "node generator/fetch-contributions.js"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": ">=18"
+  },
+  "author": "anoojshete",
+  "license": "MIT"
+}
