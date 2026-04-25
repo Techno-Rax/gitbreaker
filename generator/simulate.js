@@ -39,13 +39,17 @@ export function simulate(grid, options = {}) {
     // ── Build bricks ──
     const rows = grid.length;
     const cols = grid[0]?.length || 0;
-    const brickGap = 2;
-    const gridPadding = 15;
-    const topPadding = 50;
+    const brickGap = 3;
+    const gridPadding = 16;
+    let topPadding = 50;
     const availableWidth = width - gridPadding * 2;
-    const availableHeight = height * 0.40;
-    const brickW = (availableWidth - (cols - 1) * brickGap) / cols;
-    const brickH = (availableHeight - (rows - 1) * brickGap) / rows;
+    const brickSize = Math.floor((availableWidth - (cols - 1) * brickGap) / cols);
+    const brickW = brickSize;
+    const brickH = brickSize;
+    
+    // Center the grid horizontally
+    const totalWidth = cols * brickSize + (cols - 1) * brickGap;
+    const startX = (width - totalWidth) / 2;
 
     const bricks = [];
     for (let r = 0; r < rows; r++) {
@@ -55,7 +59,7 @@ export function simulate(grid, options = {}) {
                 bricks.push({
                     row: r,
                     col: c,
-                    x: gridPadding + c * (brickW + brickGap),
+                    x: startX + c * (brickW + brickGap),
                     y: topPadding + r * (brickH + brickGap),
                     w: brickW,
                     h: brickH,
@@ -88,8 +92,31 @@ export function simulate(grid, options = {}) {
     const frames = [];
 
     // ── Simulation loop ──
+    let bricksDestroyed = 0;
+    
     for (let frame = 0; frame < totalFrames; frame++) {
         const brickChanges = [];
+
+        // — Grid Descending Logic (Soft Floor + Pressure Zone) —
+        const dropSpeedBase = Math.min(20, 2 + bricksDestroyed * 0.1);
+        let closestDist = 9999;
+        
+        for (const brick of bricks) {
+            if (!brick.alive) continue;
+            const dist = paddleY - (brick.y + brick.h);
+            if (dist < closestDist) closestDist = dist;
+        }
+
+        let actualSpeed = dropSpeedBase;
+        if (closestDist < 100) {
+            actualSpeed *= Math.max(0.1, (closestDist - 10) / 90);
+        }
+
+        const dy = actualSpeed * dt;
+        topPadding += dy;
+        for (const brick of bricks) {
+            brick.y += dy;
+        }
 
         // — AI paddle: follow ball with slight lag —
         const targetX = ballX - paddleW / 2;
@@ -167,6 +194,7 @@ export function simulate(grid, options = {}) {
 
                 if (brick.hp <= 0) {
                     brick.alive = false;
+                    bricksDestroyed++;
                 }
 
                 brickChanges.push({
@@ -209,6 +237,6 @@ export function simulate(grid, options = {}) {
         frames,
         brickStates,
         finalScore: score,
-        brickLayout: { rows, cols, brickW, brickH, brickGap, gridPadding, topPadding },
+        brickLayout: { rows, cols, brickW, brickH, brickGap, gridPadding, topPadding, startX, topPaddingOffset: topPadding - 50 },
     };
 }

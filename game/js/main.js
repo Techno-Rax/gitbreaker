@@ -344,6 +344,45 @@ class Game {
             for (const b of this.balls) b.slowMo = 1;
         }
 
+        // ── Grid Descending Logic (Soft Floor + Pressure Zone) ──
+        const dropSpeedBase = Math.min(25, 3 + this.bricksDestroyedCount * 0.1);
+        let closestDist = 9999;
+        let dangerCount = 0;
+
+        for (const brick of this.bricks) {
+            if (!brick.alive) continue;
+            const dist = this.gravityDir > 0 
+                ? this.paddle.y - (brick.y + brick.height)
+                : brick.y - (this.paddle.y + this.paddle.height);
+                
+            if (dist < closestDist) closestDist = dist;
+            if (dist < 30) dangerCount++;
+        }
+
+        let actualSpeed = dropSpeedBase;
+        // Soft Floor: slow down when getting close to paddle
+        if (closestDist < 120) {
+            actualSpeed *= Math.max(0.05, (closestDist - 10) / 110);
+        }
+
+        const dy = actualSpeed * this.gravityDir * dt;
+        if (dy !== 0) {
+            this.gridInfo.startY += dy;
+            for (const brick of this.bricks) {
+                brick.y += dy;
+            }
+        }
+
+        // Pressure Zone: Game Over if stacked too much
+        if (dangerCount > 15) {
+            this.state = State.GAME_OVER;
+            this.sound.gameOver();
+            import('./ui.js').then(UI => {
+                UI.showGameOver(this.score, this.bricksDestroyedCount, this.maxCombo);
+            });
+            return;
+        }
+
         // ── Paddle ──
         this.paddle.update(dt);
 

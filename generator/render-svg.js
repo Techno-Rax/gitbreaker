@@ -125,6 +125,15 @@ export function renderSVG(simResult, width, height, grid, options = {}) {
     svg += `        filter: drop-shadow(0 0 4px #00d4ff);\n`;
     svg += `      }\n`;
 
+    // Grid dropping animation
+    svg += `      @keyframes gridDescend {\n`;
+    svg += `        0% { transform: translateY(0px); }\n`;
+    svg += `        100% { transform: translateY(${brickLayout.topPaddingOffset.toFixed(1)}px); }\n`;
+    svg += `      }\n`;
+    svg += `      .grid-layer {\n`;
+    svg += `        animation: gridDescend ${totalDuration}s forwards;\n`;
+    svg += `      }\n`;
+
     // Brick styles with destruction animation
     for (const [key, events] of brickEvents) {
         const deathEvent = events.find(e => e.hp <= 0);
@@ -173,20 +182,23 @@ export function renderSVG(simResult, width, height, grid, options = {}) {
     svg += `</text>\n`;
 
     // ── Bricks ──
+    const originalTopPadding = 50;
+    svg += `  <g class="grid-layer">\n`;
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
             const hp = grid[r][c];
             if (hp <= 0) continue;
 
-            const x = gridPadding + c * (brickW + brickGap);
-            const y = topPadding + r * (brickH + brickGap);
+            const x = brickLayout.startX + c * (brickW + brickGap);
+            const y = originalTopPadding + r * (brickH + brickGap);
             const color = HP_COLORS[Math.min(hp, 4)] || HP_COLORS[1];
             const key = `${r}-${c}`;
             const className = brickEvents.has(key) ? `brick-${key.replace('-', '_')}` : '';
 
-            svg += `  <rect class="${className}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${brickW.toFixed(1)}" height="${brickH.toFixed(1)}" fill="${color}" rx="2" opacity="0.9"/>\n`;
+            svg += `    <rect class="${className}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${brickW.toFixed(1)}" height="${brickH.toFixed(1)}" fill="${color}" rx="2" opacity="0.9"/>\n`;
         }
     }
+    svg += `  </g>\n`;
 
     // ── Paddle ──
     svg += `  <rect class="paddle" x="${frames[0].paddleX}" y="${paddleY}" width="${frames[0].paddleW}" height="${paddleH}" fill="#00d4ff" rx="${paddleH / 2}" filter="url(#glow-blue)"/>\n`;

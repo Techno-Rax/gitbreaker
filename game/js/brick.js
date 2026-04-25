@@ -104,14 +104,22 @@ export class Brick {
         const ox = dx - (w - this.width) / 2;
         const oy = dy - (h - this.height) / 2;
 
-        // Fill
+        // Fill and Stroke (Rounded GitHub style)
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(ox, oy, w, h, 2);
+        } else {
+            // Fallback for older browsers
+            ctx.rect(ox, oy, w, h);
+        }
+        
         ctx.fillStyle = this.flashTimer > 0 ? '#ffffff' : this.colors.fill;
-        ctx.fillRect(ox, oy, w, h);
+        ctx.fill();
 
-        // Border (top and left edges only — light source effect)
-        ctx.fillStyle = this.flashTimer > 0 ? '#ffffff' : this.colors.border;
-        ctx.fillRect(ox, oy, w, 1); // Top
-        ctx.fillRect(ox, oy, 1, h); // Left
+        // Border (Top and left for light source effect, but simple stroke looks cleaner for rounded rects)
+        ctx.strokeStyle = this.flashTimer > 0 ? '#ffffff' : this.colors.border;
+        ctx.lineWidth = 1;
+        ctx.stroke();
 
         // Crack lines for damaged bricks
         if (this.hp < this.maxHp && this.hp > 0) {

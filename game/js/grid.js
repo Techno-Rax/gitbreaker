@@ -41,12 +41,16 @@ export function generateGrid(data, canvasWidth, canvasHeight, options = {}) {
     if (rows === 0 || cols === 0) return { bricks, spatialGrid: [], gridInfo: {} };
 
     const gridPadding = 16;
-    const brickGap = 2;
+    const brickGap = 3; // Standard GitHub gap
     const availableWidth = canvasWidth - gridPadding * 2;
-    const availableHeight = canvasHeight * 0.42;
-    const brickWidth = (availableWidth - (cols - 1) * brickGap) / cols;
-    const brickHeight = (availableHeight - (rows - 1) * brickGap) / rows;
-    const startX = gridPadding;
+    // Force square bricks based on columns
+    const brickSize = Math.floor((availableWidth - (cols - 1) * brickGap) / cols);
+    const brickWidth = brickSize;
+    const brickHeight = brickSize;
+    
+    // Center the grid horizontally
+    const totalWidth = cols * brickSize + (cols - 1) * brickGap;
+    const startX = (canvasWidth - totalWidth) / 2;
     const startY = topPadding;
 
     // Spatial grid for O(1) collision lookup
