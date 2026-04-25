@@ -1,49 +1,37 @@
 /**
- * Main — Game loop, state machine, orchestrator
+ * Main — Game loop with anti-gravity, spatial collisions, slow-mo
  * @module main
  */
 
 import { Ball } from './ball.js';
 import { Paddle } from './paddle.js';
-import { generateGrid, generateDemoGrid } from './grid.js';
-import { ballPaddle, ballBricks, laserBricks, powerupPaddle } from './collision.js';
+import { generateGrid, generateDemoGrid, brickAtPosition } from './grid.js';
+import { ballPaddle, ballBricksSpatial, laserBricksSpatial, powerupPaddle } from './collision.js';
 import { PowerUpManager } from './powerups.js';
 import { ParticleSystem } from './particles.js';
 import { SoundEngine } from './sound.js';
 import { fetchContributions } from './contributions.js';
 import * as UI from './ui.js';
 
-// ── Game States ──
-const State = {
-    MENU: 'MENU',
-    LOADING: 'LOADING',
-    PLAYING: 'PLAYING',
-    PAUSED: 'PAUSED',
-    GAME_OVER: 'GAME_OVER',
-    WIN: 'WIN',
-};
+const State = { MENU: 0, LOADING: 1, PLAYING: 2, PAUSED: 3, GAME_OVER: 4, WIN: 5 };
 
-// ── Game Instance ──
 class Game {
     constructor() {
-        // Canvas setup
         this.canvas = document.getElementById('game-canvas');
         this.ctx = this.canvas.getContext('2d');
-
-        // Sizing
         this._resize();
         window.addEventListener('resize', () => this._resize());
 
-        // State
         this.state = State.MENU;
         this.username = 'anoojshete';
 
-        // Game objects
         /** @type {Ball[]} */
         this.balls = [];
         this.paddle = null;
         /** @type {import('./brick.js').Brick[]} */
         this.bricks = [];
+        this.spatialGrid = [];
+        this.gridInfo = {};
 
         // Systems
         this.powerUps = new PowerUpManager();
@@ -59,148 +47,210 @@ class Game {
         this.totalBricks = 0;
         this.startTime = 0;
         this.comboTimer = 0;
+        this.streakCombo = 0; // Consecutive bricks without miss
 
         // Screen shake
         this.shakeIntensity = 0;
         this.shakeX = 0;
         this.shakeY = 0;
 
+        // --- Anti-Gravity ---
+        this.gravityDir = 1; // 1 = normal (paddle bottom), -1 = inverted (paddle top)
+        this.baseGravity = 50; // Subtle gravity pull
+        this.gravityLocked = false; // Prevent spam
+
+        // --- Slow-mo on last life ---
+        this.slowMoActive = false;
+        this.slowMoFactor = 1;
+
         // Timing
         this.lastTime = 0;
-        this.accumulator = 0;
-        this.fixedDt = 1 / 120; // Physics at 120Hz
+        this.gameTime = 0; // Global time for animations
 
-        // Win confetti timer
+        // FPS cap
+        this.targetFPS = 60;
+        this.frameInterval = 1000 / this.targetFPS;
+        this.accumulator = 0;
+
+        // Win confetti
         this.confettiTimer = 0;
 
-        // Init
+        // Tooltip
+        this._hoveredBrick = null;
+        this._setupTooltip();
+
         UI.initUI();
         this._bindEvents();
         this._startLoop();
     }
 
-    /** Resize canvas to fit container */
     _resize() {
-        const wrapper = document.getElementById('game-wrapper');
-        const maxW = 900;
-        const w = Math.min(window.innerWidth - 20, maxW);
-        const h = Math.min(window.innerHeight - 20, w * 0.65);
-
+        const maxW = 1100;
+        const w = Math.min(window.innerWidth - 48, maxW);
+        const h = Math.min(window.innerHeight - 160, w * 0.55);
         this.canvas.width = w;
         this.canvas.height = h;
-
-        // Re-position paddle if active
         if (this.paddle) {
             this.paddle.canvasWidth = w;
             this.paddle.canvasHeight = h;
-            this.paddle.y = h - 40;
         }
     }
 
-    /** Bind UI event listeners */
+    _setupTooltip() {
+        this.canvas.addEventListener('mousemove', (e) => {
+            if (this.state !== State.PLAYING || !this.gridInfo.rows) return;
+            const rect = this.canvas.getBoundingClientRect();
+            const scaleX = this.canvas.width / rect.width;
+            const scaleY = this.canvas.height / rect.height;
+            const mx = (e.clientX - rect.left) * scaleX;
+            const my = (e.clientY - rect.top) * scaleY;
+
+            const brick = brickAtPosition(mx, my, this.gridInfo, this.spatialGrid);
+
+            // Reset previous hover
+            if (this._hoveredBrick && this._hoveredBrick !== brick) {
+                this._hoveredBrick.isHovered = false;
+            }
+
+            if (brick) {
+                brick.isHovered = true;
+                this._hoveredBrick = brick;
+                UI.showBrickTooltip(brick, rect, scaleX, scaleY);
+            } else {
+                this._hoveredBrick = null;
+                UI.hideBrickTooltip();
+            }
+        });
+
+        this.canvas.addEventListener('mouseleave', () => {
+            if (this._hoveredBrick) {
+                this._hoveredBrick.isHovered = false;
+                this._hoveredBrick = null;
+            }
+            UI.hideBrickTooltip();
+        });
+    }
+
     _bindEvents() {
-        // Play button — with contributions
         document.getElementById('play-btn')?.addEventListener('click', () => {
             this.sound.init();
             this.username = UI.getUsername();
             this._startWithContributions(this.username);
         });
 
-        // Demo button — with static grid
         document.getElementById('demo-btn')?.addEventListener('click', () => {
             this.sound.init();
-            this.username = 'Demo Mode';
+            this.username = 'demo';
             this._startGame(generateDemoGrid(), true);
         });
 
-        // Restart buttons
-        document.getElementById('restart-btn')?.addEventListener('click', () => {
-            this._restartGame();
-        });
-        document.getElementById('win-restart-btn')?.addEventListener('click', () => {
-            this._restartGame();
-        });
-
-        // Resume
+        document.getElementById('restart-btn')?.addEventListener('click', () => this._restartGame());
+        document.getElementById('win-restart-btn')?.addEventListener('click', () => this._restartGame());
         document.getElementById('resume-btn')?.addEventListener('click', () => {
             this.state = State.PLAYING;
             UI.hideAllScreens();
+            UI.setStatus('running');
         });
 
-        // Sound toggle
         document.getElementById('sound-toggle')?.addEventListener('click', () => {
             this.sound.init();
-            const muted = this.sound.toggleMute();
-            UI.updateSoundButton(muted);
+            UI.updateSoundButton(this.sound.toggleMute());
         });
 
-        // Pause (Escape key)
         document.addEventListener('keydown', (e) => {
+            // Pause
             if (e.key === 'Escape') {
                 if (this.state === State.PLAYING) {
                     this.state = State.PAUSED;
                     UI.showScreen('pause-screen');
+                    UI.setStatus('paused');
                 } else if (this.state === State.PAUSED) {
                     this.state = State.PLAYING;
                     UI.hideAllScreens();
+                    UI.setStatus('running');
                 }
             }
 
-            // Launch ball on space/click
+            // Launch
             if ((e.key === ' ' || e.code === 'Space') && this.state === State.PLAYING) {
-                this._tryLaunchBall();
+                e.preventDefault();
+                this._tryLaunch();
+            }
+
+            // Gravity flip (G key)
+            if ((e.key === 'g' || e.key === 'G') && this.state === State.PLAYING) {
+                if (!this.gravityLocked) {
+                    this.flipGravity();
+                    this.gravityLocked = true;
+                    setTimeout(() => { this.gravityLocked = false; }, 600);
+                }
             }
         });
 
-        // Launch ball on canvas click/touch
         this.canvas.addEventListener('click', () => {
-            if (this.state === State.PLAYING) {
-                this._tryLaunchBall();
-            }
+            if (this.state === State.PLAYING) this._tryLaunch();
         });
 
-        // Enter key on username input
         document.getElementById('username-input')?.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                document.getElementById('play-btn')?.click();
-            }
+            if (e.key === 'Enter') document.getElementById('play-btn')?.click();
         });
     }
 
-    /** Try to launch any unlaunched ball */
-    _tryLaunchBall() {
-        const unlaunchedBall = this.balls.find(b => !b.active);
-        if (unlaunchedBall) {
-            unlaunchedBall.launch();
+    /** Flip gravity direction */
+    flipGravity() {
+        this.gravityDir *= -1;
+        this.paddle.gravityDir = this.gravityDir;
+
+        // Reposition paddle
+        for (const ball of this.balls) {
+            if (!ball.active) ball.attachTo(this.paddle, this.gravityDir);
+            ball.gravity = this.baseGravity;
+        }
+
+        // Visual + audio feedback
+        this.sound.gravityFlip();
+        UI.updateGravity(this.gravityDir);
+        UI.triggerGravityFlip(this.gravityDir < 0);
+
+        // Particles — burst at paddle
+        this.particles.emitSparkle(
+            this.paddle.x + this.paddle.width / 2,
+            this.paddle.y + this.paddle.height / 2,
+            this.gravityDir > 0 ? '#00ff88' : '#00ffd5'
+        );
+
+        // Shift particle gravity direction
+        this.shakeIntensity = Math.max(this.shakeIntensity, 6);
+    }
+
+    _tryLaunch() {
+        const unlaunched = this.balls.find(b => !b.active);
+        if (unlaunched) {
+            unlaunched.launch(this.gravityDir);
             this.sound.launch();
         }
     }
 
-    /** Start game with fetched contributions */
     async _startWithContributions(username) {
         this.state = State.LOADING;
         UI.showLoading();
+        UI.setStatus('fetching...');
 
         try {
             const { grid, totalContributions } = await fetchContributions(username);
-            console.log(`Loaded ${totalContributions} contributions for ${username}`);
+            console.log(`Loaded ${totalContributions} contributions`);
             this._startGame(grid, true);
         } catch (err) {
-            console.warn('Failed to fetch contributions, using demo grid:', err.message);
-            // Fallback to demo
+            console.warn('API failed, using demo:', err.message);
             this._startGame(generateDemoGrid(), true);
         }
     }
 
-    /**
-     * Initialize and start the game
-     * @param {number[][]} gridData - 7×N grid of HP values
-     * @param {boolean} isHpData - Whether data is already HP values
-     */
     _startGame(gridData, isHpData = false) {
         this.state = State.PLAYING;
+        UI.setStatus('running');
 
-        // Reset stats
+        // Reset
         this.score = 0;
         this.lives = 3;
         this.combo = 0;
@@ -208,19 +258,32 @@ class Game {
         this.bricksDestroyedCount = 0;
         this.startTime = performance.now();
         this.comboTimer = 0;
+        this.streakCombo = 0;
+        this.gravityDir = 1;
+        this.slowMoActive = false;
+        this.slowMoFactor = 1;
+        this.shakeIntensity = 0;
+        this.confettiTimer = 0;
 
-        // Create game objects
+        // Paddle
         this.paddle = new Paddle(this.canvas.width, this.canvas.height);
+        this.paddle.gravityDir = 1;
 
+        // Ball
         this.balls = [];
         const ball = this.createBall();
-        ball.attachTo(this.paddle);
+        ball.gravity = this.baseGravity;
+        ball.attachTo(this.paddle, this.gravityDir);
         this.balls.push(ball);
 
-        this.bricks = generateGrid(gridData, this.canvas.width, this.canvas.height, {
+        // Bricks — with spatial grid
+        const result = generateGrid(gridData, this.canvas.width, this.canvas.height, {
             isHpData,
-            topPadding: 60,
+            topPadding: 50,
         });
+        this.bricks = result.bricks;
+        this.spatialGrid = result.spatialGrid;
+        this.gridInfo = result.gridInfo;
         this.totalBricks = this.bricks.length;
 
         // Reset systems
@@ -232,30 +295,30 @@ class Game {
         UI.updateScore(0);
         UI.updateLives(this.lives);
         UI.updateUsername(this.username);
+        UI.updateGravity(1);
     }
 
-    /** Create a new ball instance */
     createBall() {
-        return new Ball(this.canvas.width / 2, this.canvas.height - 60, 6);
+        return new Ball(this.canvas.width / 2, this.canvas.height - 50, 5);
     }
 
-    /** Restart with same grid */
     _restartGame() {
-        // Re-fetch or re-use demo
-        if (this.username === 'Demo Mode') {
+        if (this.username === 'demo') {
             this._startGame(generateDemoGrid(), true);
         } else {
             this._startWithContributions(this.username);
         }
     }
 
-    /** Main game loop */
+    // ── Game Loop (FPS capped) ──
     _startLoop() {
         const loop = (timestamp) => {
-            const dt = Math.min((timestamp - this.lastTime) / 1000, 0.05); // Cap at 50ms
+            const rawDt = Math.min((timestamp - this.lastTime) / 1000, 0.05);
             this.lastTime = timestamp;
 
             if (this.state === State.PLAYING) {
+                const dt = rawDt * this.slowMoFactor;
+                this.gameTime += dt;
                 this._update(dt);
             }
 
@@ -263,57 +326,61 @@ class Game {
             requestAnimationFrame(loop);
         };
 
-        requestAnimationFrame((timestamp) => {
-            this.lastTime = timestamp;
+        requestAnimationFrame((t) => {
+            this.lastTime = t;
             requestAnimationFrame(loop);
         });
     }
 
-    /**
-     * Update all game logic
-     * @param {number} dt - Delta time in seconds
-     */
     _update(dt) {
+        // Slow-mo on last life
+        if (this.lives === 1 && !this.slowMoActive) {
+            this.slowMoActive = true;
+            this.slowMoFactor = 0.75;
+            for (const b of this.balls) b.slowMo = 0.8;
+        } else if (this.lives > 1 && this.slowMoActive) {
+            this.slowMoActive = false;
+            this.slowMoFactor = 1;
+            for (const b of this.balls) b.slowMo = 1;
+        }
+
         // ── Paddle ──
         this.paddle.update(dt);
 
         // ── Balls ──
         for (const ball of this.balls) {
             if (!ball.active) {
-                // Attached to paddle
-                ball.attachTo(this.paddle);
+                ball.attachTo(this.paddle, this.gravityDir);
                 continue;
             }
 
-            const result = ball.update(dt, this.canvas.width, this.canvas.height);
+            const result = ball.update(dt, this.canvas.width, this.canvas.height, this.gravityDir);
 
-            if (result === 'bottom') {
+            if (result === 'lost') {
                 ball.active = false;
-
-                // Remove this ball
                 const activeBalls = this.balls.filter(b => b.active);
 
                 if (activeBalls.length === 0) {
-                    // All balls lost
                     this.lives--;
                     UI.updateLives(this.lives);
                     this.sound.ballLost();
                     this.combo = 0;
+                    this.streakCombo = 0;
                     UI.showCombo(0);
 
                     if (this.lives <= 0) {
-                        // Game over
                         this.state = State.GAME_OVER;
                         this.sound.gameOver();
                         UI.showGameOver(this.score, this.bricksDestroyedCount, this.maxCombo);
                         return;
                     }
 
-                    // Reset to single ball on paddle
+                    // Reset to single ball
                     this.balls = [];
-                    const newBall = this.createBall();
-                    newBall.attachTo(this.paddle);
-                    this.balls.push(newBall);
+                    const nb = this.createBall();
+                    nb.gravity = this.baseGravity;
+                    nb.attachTo(this.paddle, this.gravityDir);
+                    this.balls.push(nb);
                 }
             }
 
@@ -322,48 +389,36 @@ class Game {
                 this.sound.paddleHit();
             }
 
-            // Ball ↔ Bricks
-            const hitBrick = ballBricks(ball, this.bricks);
-            if (hitBrick) {
-                this._onBrickHit(hitBrick, ball);
-            }
+            // Ball ↔ Bricks (SPATIAL)
+            const hitBrick = ballBricksSpatial(ball, this.gridInfo, this.spatialGrid);
+            if (hitBrick) this._onBrickHit(hitBrick, ball);
         }
 
-        // Clean up inactive balls (but keep at least attached ones)
+        // Clean inactive balls
         this.balls = this.balls.filter(b => b.active || !this.balls.some(ob => ob.active));
 
-        // ── Lasers ↔ Bricks ──
-        const laserHits = laserBricks(this.paddle.lasers, this.bricks);
-        for (const { brick } of laserHits) {
-            this._onBrickHit(brick, null);
-        }
+        // ── Lasers ↔ Bricks (SPATIAL) ──
+        const laserHits = laserBricksSpatial(this.paddle.lasers, this.gridInfo, this.spatialGrid);
+        for (const { brick } of laserHits) this._onBrickHit(brick, null);
 
         // ── Power-ups ──
         this.powerUps.update(dt, this.canvas.height, this);
-
-        // Check power-up collection
-        for (const powerup of this.powerUps.falling) {
-            if (powerup.active && powerupPaddle(powerup, this.paddle)) {
-                powerup.active = false;
-                this.powerUps.activate(powerup, this);
+        for (const pu of this.powerUps.falling) {
+            if (pu.active && powerupPaddle(pu, this.paddle)) {
+                pu.active = false;
+                this.powerUps.activate(pu, this);
                 this.sound.powerUp();
-                this.particles.emitSparkle(
-                    powerup.x + powerup.size / 2,
-                    powerup.y + powerup.size / 2,
-                    powerup.type.color
-                );
+                this.particles.emitSparkle(pu.x + pu.size / 2, pu.y + pu.size / 2, pu.type.color);
             }
         }
 
         // ── Bricks ──
-        for (const brick of this.bricks) {
-            brick.update(dt);
-        }
+        for (const brick of this.bricks) brick.update(dt, this.gameTime);
 
         // ── Particles ──
         this.particles.update(dt);
 
-        // ── Combo timer ──
+        // ── Combo decay ──
         if (this.combo > 0) {
             this.comboTimer -= dt;
             if (this.comboTimer <= 0) {
@@ -376,8 +431,8 @@ class Game {
         if (this.shakeIntensity > 0) {
             this.shakeX = (Math.random() - 0.5) * this.shakeIntensity;
             this.shakeY = (Math.random() - 0.5) * this.shakeIntensity;
-            this.shakeIntensity *= 0.9;
-            if (this.shakeIntensity < 0.5) {
+            this.shakeIntensity *= 0.88;
+            if (this.shakeIntensity < 0.3) {
                 this.shakeIntensity = 0;
                 this.shakeX = 0;
                 this.shakeY = 0;
@@ -385,131 +440,94 @@ class Game {
         }
 
         // ── Win check ──
-        const aliveBricks = this.bricks.filter(b => b.alive).length;
-        if (aliveBricks === 0 && this.totalBricks > 0) {
+        const alive = this.bricks.filter(b => b.alive).length;
+        if (alive === 0 && this.totalBricks > 0) {
             this.state = State.WIN;
             this.sound.win();
-            const elapsed = (performance.now() - this.startTime) / 1000;
-            UI.showWin(this.score, elapsed);
+            UI.showWin(this.score, (performance.now() - this.startTime) / 1000);
             this.confettiTimer = 3;
         }
 
         // ── Win confetti ──
         if (this.state === State.WIN && this.confettiTimer > 0) {
             this.confettiTimer -= dt;
-            if (Math.random() > 0.7) {
-                this.particles.emitConfetti(this.canvas.width, this.canvas.height);
-            }
+            if (Math.random() > 0.6) this.particles.emitConfetti(this.canvas.width, this.canvas.height);
         }
     }
 
-    /**
-     * Handle brick being hit
-     * @param {import('./brick.js').Brick} brick
-     * @param {Ball|null} ball
-     */
     _onBrickHit(brick, ball) {
         const destroyed = brick.hit();
 
         // Combo
         this.combo++;
-        this.comboTimer = 1.5; // Reset combo timer
+        this.streakCombo++;
+        this.comboTimer = 1.5;
         if (this.combo > this.maxCombo) this.maxCombo = this.combo;
         UI.showCombo(this.combo);
 
-        // Score: base 10 × HP × combo multiplier
-        const points = 10 * (brick.maxHp) * Math.min(this.combo, 10);
+        // Score: base × HP × combo × streak bonus
+        const streakBonus = 1 + Math.floor(this.streakCombo / 20) * 0.5;
+        const points = Math.round(10 * brick.maxHp * Math.min(this.combo, 10) * streakBonus);
         this.score += points;
         UI.updateScore(this.score);
 
+        const speedMul = ball ? ball.speedMultiplier : 1;
+
         if (destroyed) {
-            // Brick fully destroyed
             this.bricksDestroyedCount++;
-            this.sound.brickHit(true, brick.maxHp);
-
-            // Particles
-            this.particles.emitBrickBreak(
-                brick.centerX, brick.centerY,
-                brick.colors.fill,
-                8 + brick.maxHp * 3
-            );
-
-            // Screen shake (stronger for higher HP bricks)
-            this.shakeIntensity = Math.max(this.shakeIntensity, 3 + brick.maxHp * 2);
-
-            // Power-up chance
-            this.powerUps.trySpawn(brick);
-
-            // Notify ball
+            this.sound.brickHit(true, brick.maxHp, speedMul);
+            this.particles.emitBrickBreak(brick.centerX, brick.centerY, brick.colors.fill, 6 + brick.maxHp * 2);
+            this.shakeIntensity = Math.max(this.shakeIntensity, 2 + brick.maxHp * 1.5);
+            this.powerUps.trySpawn(brick, this.gravityDir);
             if (ball) ball.onBrickDestroyed();
+            if (this.combo > 1) this.sound.comboHit(this.combo);
 
-            // Combo sound
-            if (this.combo > 1) {
-                this.sound.comboHit(this.combo);
+            // Clear spatial grid cell
+            if (this.spatialGrid[brick.gridRow]) {
+                this.spatialGrid[brick.gridRow][brick.gridCol] = null;
             }
         } else {
-            // Brick damaged but alive
-            this.sound.brickHit(false, brick.hp);
-            this.particles.emitBrickHit(
-                brick.centerX, brick.centerY,
-                brick.colors.fill
-            );
-            this.shakeIntensity = Math.max(this.shakeIntensity, 2);
+            this.sound.brickHit(false, brick.hp, speedMul);
+            this.particles.emitBrickHit(brick.centerX, brick.centerY, brick.colors.fill);
+            this.shakeIntensity = Math.max(this.shakeIntensity, 1.5);
         }
     }
 
-    /** Render everything */
     _render() {
         const ctx = this.ctx;
         const w = this.canvas.width;
         const h = this.canvas.height;
 
-        // Clear
         ctx.clearRect(0, 0, w, h);
 
-        // Background
-        ctx.fillStyle = '#0d1230';
+        // Background — pure dark
+        ctx.fillStyle = '#080810';
         ctx.fillRect(0, 0, w, h);
 
-        // Subtle grid lines
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
-        ctx.lineWidth = 1;
-        const gridSize = 30;
-        for (let x = 0; x < w; x += gridSize) {
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, h);
-            ctx.stroke();
-        }
-        for (let y = 0; y < h; y += gridSize) {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(w, y);
-            ctx.stroke();
+        // Subtle dot grid (cheaper than line grid)
+        ctx.fillStyle = 'rgba(255,255,255,0.025)';
+        const gridStep = 24;
+        for (let x = gridStep; x < w; x += gridStep) {
+            for (let y = gridStep; y < h; y += gridStep) {
+                ctx.fillRect(x, y, 1, 1);
+            }
         }
 
-        if (this.state === State.MENU || this.state === State.LOADING) {
-            return; // Don't render game objects on menu
-        }
+        if (this.state === State.MENU || this.state === State.LOADING) return;
 
-        // Apply screen shake
         ctx.save();
         ctx.translate(this.shakeX, this.shakeY);
 
         // ── Bricks ──
         for (const brick of this.bricks) {
-            brick.render(ctx);
+            brick.render(ctx, this.gameTime);
         }
 
         // ── Paddle ──
-        if (this.paddle) {
-            this.paddle.render(ctx);
-        }
+        if (this.paddle) this.paddle.render(ctx);
 
         // ── Balls ──
-        for (const ball of this.balls) {
-            ball.render(ctx);
-        }
+        for (const ball of this.balls) ball.render(ctx);
 
         // ── Power-ups ──
         this.powerUps.render(ctx, w);
@@ -517,69 +535,43 @@ class Game {
         // ── Particles ──
         this.particles.render(ctx);
 
-        ctx.restore(); // Remove shake transform
+        ctx.restore();
 
-        // ── Active power-up indicators at bottom ──
-        this._renderPowerUpTimers(ctx, w, h);
-
-        // ── "Click to launch" text ──
+        // ── Launch prompt ──
         if (this.state === State.PLAYING) {
             const hasUnlaunched = this.balls.some(b => !b.active);
             if (hasUnlaunched) {
-                ctx.save();
-                ctx.font = '14px Inter';
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-                ctx.textAlign = 'center';
-                const pulse = Math.sin(performance.now() / 500) * 0.3 + 0.7;
+                const pulse = Math.sin(this.gameTime * 4) * 0.2 + 0.5;
                 ctx.globalAlpha = pulse;
-                ctx.fillText('Click or press Space to launch', w / 2, h - 70);
-                ctx.restore();
+                ctx.font = '11px JetBrains Mono';
+                ctx.fillStyle = '#8b949e';
+                ctx.textAlign = 'center';
+                ctx.fillText('click or space to launch', w / 2, h / 2 + 40);
+                ctx.globalAlpha = 1;
             }
         }
-    }
 
-    /** Render active power-up timer bars */
-    _renderPowerUpTimers(ctx, w, h) {
-        let i = 0;
-        for (const [effect, time] of this.powerUps.activeEffects) {
-            const type = Object.values(
-                { MULTIBALL: { id: 'multiball', color: '#ff4444', label: '⊕', duration: 0 },
-                  WIDE_PADDLE: { id: 'wide', color: '#fbbf24', label: '⬌', duration: 8 },
-                  LASER: { id: 'laser', color: '#ff0066', label: '⚡', duration: 6 },
-                  SLOW_BALL: { id: 'slow', color: '#00d4ff', label: '◎', duration: 6 } }
-            ).find(t => t.id === effect);
+        // ── Slow-mo vignette on last life ──
+        if (this.slowMoActive) {
+            const gradient = ctx.createRadialGradient(w / 2, h / 2, w * 0.3, w / 2, h / 2, w * 0.7);
+            gradient.addColorStop(0, 'rgba(0,0,0,0)');
+            gradient.addColorStop(1, 'rgba(255,0,50,0.08)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, w, h);
+        }
 
-            if (!type || type.duration === 0) continue;
-
-            const barW = 80;
-            const barH = 6;
-            const x = w - barW - 12;
-            const y = h - 20 - i * 14;
-            const progress = time / type.duration;
-
-            ctx.save();
-            // Background
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.fillRect(x, y, barW, barH);
-            // Progress
-            ctx.fillStyle = type.color;
-            ctx.shadowColor = type.color;
-            ctx.shadowBlur = 6;
-            ctx.fillRect(x, y, barW * progress, barH);
-            // Label
-            ctx.font = '10px JetBrains Mono';
-            ctx.fillStyle = type.color;
-            ctx.textAlign = 'right';
-            ctx.shadowBlur = 0;
-            ctx.fillText(type.label, x - 4, y + barH);
-            ctx.restore();
-
-            i++;
+        // ── Gravity direction indicator (arrow at edge) ──
+        if (this.state === State.PLAYING) {
+            const arrowY = this.gravityDir > 0 ? h - 6 : 6;
+            ctx.fillStyle = this.gravityDir > 0 ? 'rgba(0,255,136,0.15)' : 'rgba(0,255,213,0.15)';
+            ctx.beginPath();
+            ctx.moveTo(w / 2 - 8, arrowY);
+            ctx.lineTo(w / 2, arrowY + (this.gravityDir > 0 ? 4 : -4));
+            ctx.lineTo(w / 2 + 8, arrowY);
+            ctx.fill();
         }
     }
 }
 
 // ── Boot ──
-window.addEventListener('DOMContentLoaded', () => {
-    new Game();
-});
+window.addEventListener('DOMContentLoaded', () => { new Game(); });

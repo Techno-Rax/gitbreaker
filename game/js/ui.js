@@ -1,137 +1,150 @@
 /**
- * UI — HUD updates, screen management
+ * UI — HUD, screens, score pop animation, gravity indicator
  * @module ui
  */
 
-/** @type {Object<string, HTMLElement>} */
-const elements = {};
+const el = {};
 
-/** Cache DOM elements */
 export function initUI() {
-    elements.startScreen = document.getElementById('start-screen');
-    elements.gameoverScreen = document.getElementById('gameover-screen');
-    elements.winScreen = document.getElementById('win-screen');
-    elements.pauseScreen = document.getElementById('pause-screen');
-    elements.loadingScreen = document.getElementById('loading-screen');
-    elements.hud = document.getElementById('hud');
-    elements.hudScore = document.getElementById('hud-score');
-    elements.hudLives = document.getElementById('hud-lives');
-    elements.hudUsername = document.getElementById('hud-username');
-    elements.hudCombo = document.getElementById('hud-combo');
-    elements.finalScore = document.getElementById('final-score');
-    elements.bricksDestroyed = document.getElementById('bricks-destroyed');
-    elements.maxCombo = document.getElementById('max-combo');
-    elements.winScore = document.getElementById('win-score');
-    elements.winTime = document.getElementById('win-time');
-    elements.usernameInput = document.getElementById('username-input');
-    elements.soundToggle = document.getElementById('sound-toggle');
+    el.startScreen = document.getElementById('start-screen');
+    el.gameoverScreen = document.getElementById('gameover-screen');
+    el.winScreen = document.getElementById('win-screen');
+    el.pauseScreen = document.getElementById('pause-screen');
+    el.loadingScreen = document.getElementById('loading-screen');
+    el.hud = document.getElementById('hud');
+    el.hudScore = document.getElementById('hud-score');
+    el.hudLives = document.getElementById('hud-lives');
+    el.hudUsername = document.getElementById('hud-username');
+    el.hudCombo = document.getElementById('hud-combo');
+    el.hudGravity = document.getElementById('hud-gravity');
+    el.finalScore = document.getElementById('final-score');
+    el.bricksDestroyed = document.getElementById('bricks-destroyed');
+    el.maxCombo = document.getElementById('max-combo');
+    el.winScore = document.getElementById('win-score');
+    el.winTime = document.getElementById('win-time');
+    el.usernameInput = document.getElementById('username-input');
+    el.soundToggle = document.getElementById('sound-toggle');
+    el.headerStatus = document.getElementById('header-status-text');
+    el.canvasContainer = document.getElementById('canvas-container');
+    el.brickTooltip = document.getElementById('brick-tooltip');
 }
 
-/** Show a specific screen, hide others */
 export function showScreen(screenId) {
     const screens = ['start-screen', 'gameover-screen', 'win-screen', 'pause-screen', 'loading-screen'];
     for (const id of screens) {
-        const el = document.getElementById(id);
-        if (el) {
-            if (id === screenId) {
-                el.classList.remove('hidden');
-            } else {
-                el.classList.add('hidden');
-            }
-        }
+        const e = document.getElementById(id);
+        if (e) e.classList.toggle('hidden', id !== screenId);
     }
-
-    // Show/hide HUD
-    if (screenId === null) {
-        elements.hud?.classList.remove('hidden');
-    }
+    if (screenId === null) el.hud?.classList.remove('hidden');
 }
 
-/** Hide all overlays and show HUD */
-export function hideAllScreens() {
-    showScreen(null);
-}
+export function hideAllScreens() { showScreen(null); }
+export function showLoading() { showScreen('loading-screen'); }
 
-/** Show loading screen */
-export function showLoading() {
-    showScreen('loading-screen');
-}
-
-/** Update HUD score */
+/** Update score with pop animation */
 export function updateScore(score) {
-    if (elements.hudScore) {
-        elements.hudScore.textContent = score.toLocaleString();
-    }
+    if (!el.hudScore) return;
+    el.hudScore.textContent = score.toLocaleString();
+    // Trigger pop animation
+    el.hudScore.classList.remove('pop');
+    void el.hudScore.offsetWidth; // Reflow
+    el.hudScore.classList.add('pop');
 }
 
-/** Update HUD lives */
 export function updateLives(lives) {
-    if (elements.hudLives) {
-        elements.hudLives.textContent = '❤️'.repeat(Math.max(0, lives));
-    }
+    if (el.hudLives) el.hudLives.textContent = '❤️'.repeat(Math.max(0, lives));
 }
 
-/** Update HUD username */
 export function updateUsername(username) {
-    if (elements.hudUsername) {
-        elements.hudUsername.textContent = username;
-    }
+    if (el.hudUsername) el.hudUsername.textContent = username;
 }
 
-/** Show combo counter */
 export function showCombo(combo) {
-    if (!elements.hudCombo) return;
-
+    if (!el.hudCombo) return;
     if (combo > 1) {
-        elements.hudCombo.textContent = `x${combo}`;
-        elements.hudCombo.classList.remove('hidden');
-        // Re-trigger animation
-        elements.hudCombo.style.animation = 'none';
-        elements.hudCombo.offsetHeight; // Reflow
-        elements.hudCombo.style.animation = '';
+        el.hudCombo.textContent = `x${combo}`;
+        el.hudCombo.classList.remove('hidden');
+        el.hudCombo.style.animation = 'none';
+        void el.hudCombo.offsetHeight;
+        el.hudCombo.style.animation = '';
     } else {
-        elements.hudCombo.classList.add('hidden');
+        el.hudCombo.classList.add('hidden');
     }
 }
 
-/**
- * Show game over screen with stats
- * @param {number} score
- * @param {number} destroyed
- * @param {number} maxComboVal
- */
+/** Update gravity HUD indicator */
+export function updateGravity(dir) {
+    if (!el.hudGravity) return;
+    if (dir > 0) {
+        el.hudGravity.innerHTML = '<span>▼</span> GRAVITY';
+        el.hudGravity.classList.remove('inverted');
+    } else {
+        el.hudGravity.innerHTML = '<span>▲</span> ANTI-GRAV';
+        el.hudGravity.classList.add('inverted');
+    }
+}
+
+/** Trigger canvas tilt effect */
+export function triggerGravityFlip(inverted) {
+    if (!el.canvasContainer) return;
+    el.canvasContainer.classList.add('gravity-flip');
+    el.canvasContainer.classList.toggle('tilt-inverted', inverted);
+    el.canvasContainer.classList.toggle('tilt-normal', !inverted);
+    setTimeout(() => el.canvasContainer.classList.remove('gravity-flip'), 400);
+}
+
+/** Update header status text */
+export function setStatus(text) {
+    if (el.headerStatus) el.headerStatus.textContent = text;
+}
+
+/** Show brick tooltip */
+export function showBrickTooltip(brick, canvasRect, scaleX, scaleY) {
+    if (!el.brickTooltip || !brick?.meta) {
+        hideBrickTooltip();
+        return;
+    }
+
+    const date = new Date(brick.meta.date);
+    const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const count = brick.meta.count;
+    el.brickTooltip.textContent = `${count} commit${count !== 1 ? 's' : ''} on ${formatted}`;
+
+    // Position tooltip
+    const bx = brick.x / scaleX + canvasRect.left;
+    const by = brick.y / scaleY + canvasRect.top;
+    el.brickTooltip.style.left = `${bx}px`;
+    el.brickTooltip.style.top = `${by - 28}px`;
+    el.brickTooltip.classList.add('visible');
+}
+
+export function hideBrickTooltip() {
+    el.brickTooltip?.classList.remove('visible');
+}
+
 export function showGameOver(score, destroyed, maxComboVal) {
-    if (elements.finalScore) elements.finalScore.textContent = score.toLocaleString();
-    if (elements.bricksDestroyed) elements.bricksDestroyed.textContent = destroyed;
-    if (elements.maxCombo) elements.maxCombo.textContent = `x${maxComboVal}`;
+    if (el.finalScore) el.finalScore.textContent = score.toLocaleString();
+    if (el.bricksDestroyed) el.bricksDestroyed.textContent = destroyed;
+    if (el.maxCombo) el.maxCombo.textContent = `x${maxComboVal}`;
     showScreen('gameover-screen');
-    elements.hud?.classList.add('hidden');
+    el.hud?.classList.add('hidden');
+    setStatus('process killed');
 }
 
-/**
- * Show win screen with stats
- * @param {number} score
- * @param {number} elapsedSeconds
- */
-export function showWin(score, elapsedSeconds) {
-    if (elements.winScore) elements.winScore.textContent = score.toLocaleString();
-
-    const mins = Math.floor(elapsedSeconds / 60);
-    const secs = Math.floor(elapsedSeconds % 60);
-    if (elements.winTime) elements.winTime.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
-
+export function showWin(score, elapsed) {
+    if (el.winScore) el.winScore.textContent = score.toLocaleString();
+    const m = Math.floor(elapsed / 60);
+    const s = Math.floor(elapsed % 60);
+    if (el.winTime) el.winTime.textContent = `${m}:${s.toString().padStart(2, '0')}`;
     showScreen('win-screen');
-    elements.hud?.classList.add('hidden');
+    el.hud?.classList.add('hidden');
+    setStatus('graph cleared');
 }
 
-/** Get username from input */
 export function getUsername() {
-    return elements.usernameInput?.value?.trim() || 'anoojshete';
+    return el.usernameInput?.value?.trim() || 'anoojshete';
 }
 
-/** Update sound toggle button */
 export function updateSoundButton(muted) {
-    if (elements.soundToggle) {
-        elements.soundToggle.textContent = muted ? '🔇' : '🔊';
-    }
+    if (el.soundToggle) el.soundToggle.textContent = muted ? '🔇' : '🔊';
 }

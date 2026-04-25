@@ -1,5 +1,5 @@
 /**
- * Paddle — Movement, input handling, rendering
+ * Paddle — Velocity-reactive glow, anti-gravity support
  * @module paddle
  */
 
@@ -10,31 +10,34 @@ export class Paddle {
      */
     constructor(canvasWidth, canvasHeight) {
         this.width = 100;
-        this.height = 14;
+        this.height = 12;
         this.x = (canvasWidth - this.width) / 2;
-        this.y = canvasHeight - 40;
+        this.y = canvasHeight - 36;
         this.targetX = this.x;
         this.baseWidth = this.width;
 
         // Movement
-        this.speed = 600; // pixels per second
-        this.lerpFactor = 0.15;
+        this.speed = 650;
+        this.velocity = 0; // Track velocity for glow effect
+        this.prevX = this.x;
 
-        // Input state
+        // Input
         this.moveLeft = false;
         this.moveRight = false;
         this.useMouseControl = false;
         this.mouseX = this.x + this.width / 2;
 
         // Visual
-        this.glowIntensity = 1;
         this.hitFlash = 0;
         this.widthMultiplier = 1;
-        this.widthTransition = 1;
+        this.velocityGlow = 0; // 0–1 based on speed
 
-        // Canvas bounds
+        // Bounds
         this.canvasWidth = canvasWidth;
         this.canvasHeight = canvasHeight;
+
+        // Gravity
+        this.gravityDir = 1; // 1 = bottom, -1 = top
 
         // Laser mode
         this.laserMode = false;
@@ -44,9 +47,7 @@ export class Paddle {
         this._bindEvents();
     }
 
-    /** Bind keyboard, mouse, and touch events */
     _bindEvents() {
-        // Keyboard
         this._onKeyDown = (e) => {
             if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
                 this.moveLeft = true;
@@ -62,7 +63,6 @@ export class Paddle {
             if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.moveRight = false;
         };
 
-        // Mouse
         this._onMouseMove = (e) => {
             const canvas = document.getElementById('game-canvas');
             if (!canvas) return;
@@ -72,21 +72,17 @@ export class Paddle {
             this.useMouseControl = true;
         };
 
-        // Touch
         this._onTouchMove = (e) => {
             e.preventDefault();
             const canvas = document.getElementById('game-canvas');
             if (!canvas) return;
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
-            const touch = e.touches[0];
-            this.mouseX = (touch.clientX - rect.left) * scaleX;
+            this.mouseX = (e.touches[0].clientX - rect.left) * scaleX;
             this.useMouseControl = true;
         };
 
-        this._onTouchStart = (e) => {
-            this._onTouchMove(e);
-        };
+        this._onTouchStart = (e) => { this._onTouchMove(e); };
 
         document.addEventListener('keydown', this._onKeyDown);
         document.addEventListener('keyup', this._onKeyUp);
@@ -95,7 +91,6 @@ export class Paddle {
         document.addEventListener('touchstart', this._onTouchStart, { passive: false });
     }
 
-    /** Clean up event listeners */
     destroy() {
         document.removeEventListener('keydown', this._onKeyDown);
         document.removeEventListener('keyup', this._onKeyUp);
@@ -105,79 +100,83 @@ export class Paddle {
     }
 
     /**
-     * Update paddle position
-     * @param {number} dt - Delta time in seconds
+     * Update paddle
+     * @param {number} dt
      */
     update(dt) {
+        this.prevX = this.x;
+
         // Width transition
         const targetWidth = this.baseWidth * this.widthMultiplier;
-        this.width += (targetWidth - this.width) * 0.1;
+        this.width += (targetWidth - this.width) * 0.12;
 
         if (this.useMouseControl) {
-            // Mouse/touch control — lerp to mouse position
             this.targetX = this.mouseX - this.width / 2;
         } else {
-            // Keyboard control
             if (this.moveLeft) this.targetX -= this.speed * dt;
             if (this.moveRight) this.targetX += this.speed * dt;
         }
 
-        // Clamp target
         this.targetX = Math.max(0, Math.min(this.canvasWidth - this.width, this.targetX));
-
-        // Smooth interpolation
-        this.x += (this.targetX - this.x) * this.lerpFactor;
-
-        // Clamp position
+        this.x += (this.targetX - this.x) * 0.18;
         this.x = Math.max(0, Math.min(this.canvasWidth - this.width, this.x));
 
-        // Update y based on canvas height
-        this.y = this.canvasHeight - 40;
+        // Y based on gravity
+        this.y = this.gravityDir > 0
+            ? this.canvasHeight - 36
+            : 24;
 
-        // Decay hit flash
+        // Velocity tracking for glow
+        this.velocity = (this.x - this.prevX) / dt;
+        this.velocityGlow = Math.min(1, Math.abs(this.velocity) / 800);
+
+        // Decay flash
         if (this.hitFlash > 0) {
-            this.hitFlash -= dt * 4;
-            if (this.hitFlash < 0) this.hitFlash = 0;
+            this.hitFlash = Math.max(0, this.hitFlash - dt * 5);
         }
 
-        // Update lasers
+        // Lasers
         if (this.laserMode) {
             this.laserCooldown -= dt;
             if (this.laserCooldown <= 0) {
+                const laserDir = this.gravityDir > 0 ? -1 : 1;
                 this.lasers.push(
-                    { x: this.x + 6, y: this.y, active: true },
-                    { x: this.x + this.width - 6, y: this.y, active: true }
+                    { x: this.x + 6, y: this.y + (laserDir > 0 ? this.height : 0), dy: laserDir, active: true },
+                    { x: this.x + this.width - 6, y: this.y + (laserDir > 0 ? this.height : 0), dy: laserDir, active: true }
                 );
-                this.laserCooldown = 0.3; // Fire every 0.3 seconds
+                this.laserCooldown = 0.3;
             }
         }
 
-        // Move lasers
         for (const laser of this.lasers) {
             if (laser.active) {
-                laser.y -= 600 * dt;
-                if (laser.y < 0) laser.active = false;
+                laser.y += laser.dy * 600 * dt;
+                if (laser.y < -10 || laser.y > this.canvasHeight + 10) laser.active = false;
             }
         }
-
-        // Cleanup dead lasers
         this.lasers = this.lasers.filter(l => l.active);
     }
 
     /**
-     * Render paddle on canvas
+     * Render — velocity-reactive glow, no heavy shadows
      * @param {CanvasRenderingContext2D} ctx
      */
     render(ctx) {
-        ctx.save();
-
-        // Glow
-        const glowColor = this.laserMode ? '#ff0066' : '#00d4ff';
-        ctx.shadowColor = this.hitFlash > 0 ? '#ffffff' : glowColor;
-        ctx.shadowBlur = 12 + this.hitFlash * 20;
-
-        // Paddle body
         const r = this.height / 2;
+
+        // Velocity glow — rendered as semi-transparent underline
+        if (this.velocityGlow > 0.1) {
+            const glowAlpha = this.velocityGlow * 0.4;
+            const glowColor = this.laserMode ? `rgba(255,0,102,${glowAlpha})` : `rgba(0,212,255,${glowAlpha})`;
+            ctx.fillStyle = glowColor;
+            const spread = this.velocityGlow * 8;
+            ctx.fillRect(
+                this.x - spread, this.y - spread * 0.5,
+                this.width + spread * 2, this.height + spread
+            );
+        }
+
+        // Paddle body (rounded rect)
         ctx.beginPath();
         ctx.moveTo(this.x + r, this.y);
         ctx.lineTo(this.x + this.width - r, this.y);
@@ -188,56 +187,46 @@ export class Paddle {
         ctx.arcTo(this.x, this.y, this.x + r, this.y, r);
         ctx.closePath();
 
-        // Gradient
-        const gradient = ctx.createLinearGradient(this.x, this.y, this.x, this.y + this.height);
-        if (this.laserMode) {
-            gradient.addColorStop(0, '#ff3388');
-            gradient.addColorStop(1, '#cc0044');
+        if (this.hitFlash > 0) {
+            ctx.fillStyle = '#ffffff';
+        } else if (this.laserMode) {
+            ctx.fillStyle = '#ff3388';
         } else {
-            gradient.addColorStop(0, '#33eeff');
-            gradient.addColorStop(1, '#0099bb');
+            ctx.fillStyle = '#00b8d4';
         }
-        ctx.fillStyle = gradient;
         ctx.fill();
 
         // Top highlight
         ctx.beginPath();
-        ctx.moveTo(this.x + r + 4, this.y + 2);
-        ctx.lineTo(this.x + this.width - r - 4, this.y + 2);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.moveTo(this.x + r + 4, this.y + 1.5);
+        ctx.lineTo(this.x + this.width - r - 4, this.y + 1.5);
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        ctx.restore();
-
-        // Render lasers
+        // Lasers
         for (const laser of this.lasers) {
-            ctx.save();
-            ctx.shadowColor = '#ff0066';
-            ctx.shadowBlur = 8;
             ctx.fillStyle = '#ff0066';
-            ctx.fillRect(laser.x - 1.5, laser.y, 3, 12);
-            ctx.restore();
+            ctx.fillRect(laser.x - 1, laser.y, 2, 10);
         }
     }
 
-    /** Trigger hit flash effect */
-    flash() {
-        this.hitFlash = 1;
-    }
+    flash() { this.hitFlash = 1; }
 
-    /** Reset paddle to center */
     reset(canvasWidth, canvasHeight) {
         this.canvasWidth = canvasWidth;
         this.canvasHeight = canvasHeight;
         this.width = this.baseWidth;
         this.x = (canvasWidth - this.width) / 2;
-        this.y = canvasHeight - 40;
+        this.y = canvasHeight - 36;
         this.targetX = this.x;
         this.hitFlash = 0;
         this.laserMode = false;
         this.lasers = [];
         this.laserCooldown = 0;
         this.widthMultiplier = 1;
+        this.gravityDir = 1;
+        this.velocity = 0;
+        this.velocityGlow = 0;
     }
 }

@@ -1,104 +1,94 @@
 /**
- * Collision — All collision detection logic
+ * Collision — Optimized with spatial partitioning
  * @module collision
  */
 
+import { nearbyBricks } from './grid.js';
+
 /**
- * Check ball ↔ paddle collision
+ * Ball ↔ Paddle collision with angle reflection
  * @param {import('./ball.js').Ball} ball
  * @param {import('./paddle.js').Paddle} paddle
- * @returns {boolean} true if collision occurred
+ * @returns {boolean}
  */
 export function ballPaddle(ball, paddle) {
     if (!ball.active) return false;
 
-    // Simple AABB check first
     if (
         ball.x + ball.radius < paddle.x ||
         ball.x - ball.radius > paddle.x + paddle.width ||
         ball.y + ball.radius < paddle.y ||
         ball.y - ball.radius > paddle.y + paddle.height
-    ) {
-        return false;
+    ) return false;
+
+    // Normal gravity: ball goes down → bounce up
+    // Inverted gravity: ball goes up → bounce down
+    const goingTowardPaddle = paddle.gravityDir > 0 ? ball.dy > 0 : ball.dy < 0;
+    if (!goingTowardPaddle) return false;
+
+    const hitPos = (ball.x - paddle.x) / paddle.width;
+    const clamped = Math.max(0, Math.min(1, hitPos));
+    const maxAngle = Math.PI / 3;
+
+    let angle;
+    if (paddle.gravityDir > 0) {
+        angle = -Math.PI / 2 + (clamped - 0.5) * 2 * maxAngle;
+    } else {
+        angle = Math.PI / 2 + (clamped - 0.5) * 2 * maxAngle;
     }
 
-    // Only bounce if ball is moving downward
-    if (ball.dy <= 0) return false;
-
-    // Calculate hit position (0 = left edge, 1 = right edge)
-    const hitPosition = (ball.x - paddle.x) / paddle.width;
-    const clampedHit = Math.max(0, Math.min(1, hitPosition));
-
-    // Map hit position to angle (-60° to -120°, i.e., upper-left to upper-right)
-    const maxAngle = Math.PI / 3; // 60 degrees from vertical
-    const angle = -Math.PI / 2 + (clampedHit - 0.5) * 2 * maxAngle;
-
-    // Set new velocity
     const speed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
     ball.dx = Math.cos(angle) * speed;
     ball.dy = Math.sin(angle) * speed;
 
-    // Ensure ball is above paddle (prevent sticking)
-    ball.y = paddle.y - ball.radius - 1;
+    // Push out
+    ball.y = paddle.gravityDir > 0
+        ? paddle.y - ball.radius - 1
+        : paddle.y + paddle.height + ball.radius + 1;
 
-    // Visual feedback
-    ball.hitFlash = 0.15;
+    ball.hitFlash = 0.1;
     paddle.flash();
-
     return true;
 }
 
 /**
- * Check ball ↔ bricks collision
+ * Ball ↔ Bricks collision — SPATIALLY OPTIMIZED
+ * Only checks nearby bricks (3×3 grid neighborhood)
  * @param {import('./ball.js').Ball} ball
- * @param {import('./brick.js').Brick[]} bricks
- * @returns {import('./brick.js').Brick|null} The brick that was hit, or null
+ * @param {object} gridInfo
+ * @param {import('./brick.js').Brick[][]} spatialGrid
+ * @returns {import('./brick.js').Brick|null}
  */
-export function ballBricks(ball, bricks) {
+export function ballBricksSpatial(ball, gridInfo, spatialGrid) {
     if (!ball.active) return null;
 
-    for (const brick of bricks) {
-        if (!brick.alive) continue;
+    const nearby = nearbyBricks(ball.x, ball.y, ball.radius, gridInfo, spatialGrid);
 
-        // AABB broadphase
+    for (const brick of nearby) {
         if (
             ball.x + ball.radius < brick.x ||
             ball.x - ball.radius > brick.x + brick.width ||
             ball.y + ball.radius < brick.y ||
             ball.y - ball.radius > brick.y + brick.height
-        ) {
-            continue;
-        }
+        ) continue;
 
-        // Determine which side was hit
+        // Side detection
         const overlapLeft = (ball.x + ball.radius) - brick.x;
         const overlapRight = (brick.x + brick.width) - (ball.x - ball.radius);
         const overlapTop = (ball.y + ball.radius) - brick.y;
         const overlapBottom = (brick.y + brick.height) - (ball.y - ball.radius);
+        const minX = Math.min(overlapLeft, overlapRight);
+        const minY = Math.min(overlapTop, overlapBottom);
 
-        // Find minimum overlap to determine collision side
-        const minOverlapX = Math.min(overlapLeft, overlapRight);
-        const minOverlapY = Math.min(overlapTop, overlapBottom);
-
-        if (minOverlapX < minOverlapY) {
-            // Horizontal collision
+        if (minX < minY) {
             ball.dx = -ball.dx;
-            if (overlapLeft < overlapRight) {
-                ball.x = brick.x - ball.radius;
-            } else {
-                ball.x = brick.x + brick.width + ball.radius;
-            }
+            ball.x += overlapLeft < overlapRight ? -minX : minX;
         } else {
-            // Vertical collision
             ball.dy = -ball.dy;
-            if (overlapTop < overlapBottom) {
-                ball.y = brick.y - ball.radius;
-            } else {
-                ball.y = brick.y + brick.height + ball.radius;
-            }
+            ball.y += overlapTop < overlapBottom ? -minY : minY;
         }
 
-        ball.hitFlash = 0.1;
+        ball.hitFlash = 0.08;
         return brick;
     }
 
@@ -106,29 +96,29 @@ export function ballBricks(ball, bricks) {
 }
 
 /**
- * Check laser ↔ bricks collision
- * @param {Array} lasers - Array of laser objects {x, y, active}
- * @param {import('./brick.js').Brick[]} bricks
- * @returns {Array<{laser: object, brick: import('./brick.js').Brick}>} Array of hits
+ * Laser ↔ Bricks collision — spatially optimized
+ * @param {Array} lasers
+ * @param {object} gridInfo
+ * @param {import('./brick.js').Brick[][]} spatialGrid
+ * @returns {Array<{laser: object, brick: import('./brick.js').Brick}>}
  */
-export function laserBricks(lasers, bricks) {
+export function laserBricksSpatial(lasers, gridInfo, spatialGrid) {
     const hits = [];
+    const { startX, startY, brickWidth, brickHeight, brickGap, rows, cols } = gridInfo;
+    const cellW = brickWidth + brickGap;
+    const cellH = brickHeight + brickGap;
 
     for (const laser of lasers) {
         if (!laser.active) continue;
 
-        for (const brick of bricks) {
-            if (!brick.alive) continue;
+        const col = Math.floor((laser.x - startX) / cellW);
+        const row = Math.floor((laser.y - startY) / cellH);
 
-            if (
-                laser.x >= brick.x &&
-                laser.x <= brick.x + brick.width &&
-                laser.y >= brick.y &&
-                laser.y <= brick.y + brick.height
-            ) {
+        if (row >= 0 && row < rows && col >= 0 && col < cols) {
+            const brick = spatialGrid[row]?.[col];
+            if (brick?.alive) {
                 laser.active = false;
                 hits.push({ laser, brick });
-                break;
             }
         }
     }
@@ -137,7 +127,7 @@ export function laserBricks(lasers, bricks) {
 }
 
 /**
- * Check powerup ↔ paddle collision
+ * PowerUp ↔ Paddle
  * @param {import('./powerups.js').PowerUp} powerup
  * @param {import('./paddle.js').Paddle} paddle
  * @returns {boolean}
