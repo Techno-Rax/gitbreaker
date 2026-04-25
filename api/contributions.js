@@ -9,26 +9,7 @@
  * Endpoint: GET /api/contributions?username=<github-username>
  */
 
-const GITHUB_API = 'https://api.github.com/graphql';
-
-const QUERY = `
-query($username: String!, $from: DateTime!, $to: DateTime!) {
-  user(login: $username) {
-    contributionsCollection(from: $from, to: $to) {
-      contributionCalendar {
-        totalContributions
-        weeks {
-          contributionDays {
-            contributionCount
-            date
-            contributionLevel
-          }
-        }
-      }
-    }
-  }
-}
-`;
+import { fetchContributions } from '../generator/fetch-contributions.js';
 
 export default async function handler(req, res) {
     // CORS
@@ -57,56 +38,12 @@ export default async function handler(req, res) {
     }
 
     try {
-        const now = new Date();
-        const oneYearAgo = new Date(now);
-        oneYearAgo.setFullYear(now.getFullYear() - 1);
-
-        const variables = {
-            username,
-            from: oneYearAgo.toISOString(),
-            to: now.toISOString(),
-        };
-
-        const response = await fetch(GITHUB_API, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({ query: QUERY, variables }),
-        });
-
-        if (!response.ok) {
-            const text = await response.text();
-            return res.status(response.status).json({
-                error: `GitHub API error: ${response.status}`,
-                details: text,
-            });
-        }
-
-        const json = await response.json();
-
-        if (json.errors) {
-            return res.status(400).json({
-                error: 'GraphQL errors',
-                details: json.errors,
-            });
-        }
-
-        const calendar = json.data?.user?.contributionsCollection?.contributionCalendar;
-        if (!calendar) {
-            return res.status(404).json({
-                error: `No contribution data found for user "${username}"`,
-            });
-        }
-
+        const data = await fetchContributions(username);
+        
         // Cache for 1 hour
         res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
 
-        return res.status(200).json({
-            weeks: calendar.weeks,
-            totalContributions: calendar.totalContributions,
-        });
+        return res.status(200).json(data);
     } catch (err) {
         return res.status(500).json({
             error: 'Internal server error',
