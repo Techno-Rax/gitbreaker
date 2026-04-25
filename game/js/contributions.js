@@ -68,10 +68,7 @@ async function fetchFromPublicPage(username) {
  * @param {string} username
  */
 async function fetchFromProxy(username) {
-    const isLocal = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
-    const proxyUrl = isLocal 
-        ? `http://localhost:3000/api/contributions?username=${encodeURIComponent(username)}`
-        : `https://gitbreaker-api.vercel.app/api/contributions?username=${encodeURIComponent(username)}`;
+    const proxyUrl = `/api/contributions?username=${encodeURIComponent(username)}`;
 
     try {
         const response = await fetch(proxyUrl);

@@ -76,7 +76,7 @@ export function generateGrid(data, canvasWidth, canvasHeight, options = {}) {
 
     const gridInfo = {
         rows, cols, brickWidth, brickHeight, brickGap,
-        gridPadding, topPadding, startX, startY,
+        topPadding, startX, startY,
     };
 
     return { bricks, spatialGrid, gridInfo };
