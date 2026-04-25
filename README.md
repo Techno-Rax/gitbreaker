@@ -6,7 +6,7 @@
 
 ![GitBreaker](./output/game.svg)
 
-### ▶️ [Play the Game](https://anoojshete.github.io/gitbreaker/game/)
+### ▶️ [Play the Game](https://techno-rax.github.io/gitbreaker/game/)
 
 </div>
 
@@ -111,7 +111,7 @@ gitbreaker/
 ### Generate SVG Manually
 
 ```bash
-GITHUB_TOKEN=ghp_xxx GITHUB_USERNAME=anoojshete node generator/generate.js
+GITHUB_TOKEN=ghp_xxx GITHUB_USERNAME=techno-rax node generator/generate.js
 ```
 
 ---
@@ -134,4 +134,4 @@ GITHUB_TOKEN=ghp_xxx GITHUB_USERNAME=anoojshete node generator/generate.js
 
 ## 📜 License
 
-MIT © [anoojshete](https://github.com/anoojshete)
+MIT © [techno-rax](https://github.com/techno-rax)

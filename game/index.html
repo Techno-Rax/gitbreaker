@@ -59,7 +59,7 @@
                                 <path
                                     d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
                             </svg>
-                            <input type="text" id="username-input" placeholder="anoojshete" value="anoojshete"
+                            <input type="text" id="username-input" placeholder="techno-rax" value="techno-rax"
                                 autocomplete="off" spellcheck="false">
                         </div>
                     </div>
@@ -67,7 +67,34 @@
                     <button id="play-btn" class="btn btn-primary">
                         <span class="btn-text">▶ play</span>
                     </button>
-                    <button id="demo-btn" class="btn btn-secondary">demo mode</button>
+                    <div style="display: flex; gap: 10px; width: 100%;">
+                        <button id="demo-btn" class="btn btn-secondary" style="flex: 1;">demo mode</button>
+                        <button id="export-btn" class="btn btn-secondary" style="flex: 1; border-color: #58a6ff; color: #58a6ff;">export svg</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export Modal -->
+            <div id="export-modal" class="overlay hidden" style="background: rgba(0,0,0,0.85);">
+                <div class="overlay-content" style="max-width: 500px; text-align: left; padding: 30px;">
+                    <h2 class="start-title" style="font-size: 1.5rem; margin-bottom: 20px;">export to readme</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 15px;">Copy this Markdown snippet into your GitHub Profile README.</p>
+                    
+                    <label style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">1. Choose Theme</label>
+                    <select id="export-theme" style="width: 100%; padding: 8px; margin-top: 5px; margin-bottom: 20px; background: #0d1117; color: white; border: 1px solid #30363d; border-radius: 4px;">
+                        <option value="github-dark">GitHub Dark</option>
+                        <option value="github-light">GitHub Light</option>
+                        <option value="dracula">Dracula</option>
+                        <option value="outrun">Outrun</option>
+                    </select>
+
+                    <label style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">2. Markdown Snippet</label>
+                    <textarea id="export-code" readonly style="width: 100%; height: 80px; padding: 10px; margin-top: 5px; margin-bottom: 20px; background: #010409; color: #58a6ff; font-family: monospace; border: 1px solid #30363d; border-radius: 4px; resize: none;"></textarea>
+                    
+                    <div style="display: flex; gap: 10px;">
+                        <button id="copy-export-btn" class="btn btn-primary" style="flex: 1;">copy snippet</button>
+                        <button id="close-export-btn" class="btn btn-secondary" style="flex: 1;">close</button>
+                    </div>
                 </div>
             </div>
 
@@ -156,7 +183,7 @@
                     <span>▼</span> GRAVITY
                 </span>
                 <span class="hud-separator">│</span>
-                <span class="hud-label" id="hud-username" style="color: var(--text-secondary);">anoojshete</span>
+                <span class="hud-label" id="hud-username" style="color: var(--text-secondary);">techno-rax</span>
             </div>
             <div class="hud-right">
                 <span class="hud-label">LIVES</span>

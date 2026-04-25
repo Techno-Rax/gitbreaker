@@ -1,242 +1,177 @@
-/**
- * Simulate — Frame-by-frame deterministic game simulation
- * Used to generate SVG animation frames
- *
- * @module simulate
- */
-
-/**
- * @typedef {Object} SimFrame
- * @property {number} ballX
- * @property {number} ballY
- * @property {number} paddleX
- * @property {number} paddleW
- * @property {number} score
- * @property {Array<{row: number, col: number, hp: number}>} brickChanges - Bricks that changed this frame
- */
-
-/**
- * Run a deterministic game simulation
- *
- * @param {number[][]} grid - 7×N HP grid
- * @param {object} options
- * @param {number} [options.width=800] - Canvas width
- * @param {number} [options.height=500] - Canvas height
- * @param {number} [options.totalFrames=300] - Number of frames
- * @param {number} [options.fps=30] - Frames per second (for dt calculation)
- * @returns {object} { frames: SimFrame[], brickStates: Map, finalScore: number }
- */
-export function simulate(grid, options = {}) {
-    const {
+export function simulate(grids, options = {}) {
+    let {
         width = 800,
-        height = 500,
-        totalFrames = 300,
+        height = 340,
+        framesPerLevel = 200,
         fps = 30,
     } = options;
 
     const dt = 1 / fps;
-
-    // ── Build bricks ──
-    const rows = grid.length;
-    const cols = grid[0]?.length || 0;
-    const brickGap = 3;
+    const brickW = 11;
+    const brickH = 11;
+    const brickGap = 2;
     const gridPadding = 16;
-    let topPadding = 50;
-    const availableWidth = width - gridPadding * 2;
-    const brickSize = Math.floor((availableWidth - (cols - 1) * brickGap) / cols);
-    const brickW = brickSize;
-    const brickH = brickSize;
-    
-    // Center the grid horizontally
-    const totalWidth = cols * brickSize + (cols - 1) * brickGap;
-    const startX = (width - totalWidth) / 2;
+    const topPaddingBase = 45;
 
-    const bricks = [];
-    for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-            const hp = grid[r][c];
-            if (hp > 0) {
-                bricks.push({
-                    row: r,
-                    col: c,
-                    x: startX + c * (brickW + brickGap),
-                    y: topPadding + r * (brickH + brickGap),
-                    w: brickW,
-                    h: brickH,
-                    hp,
-                    maxHp: hp,
-                    alive: true,
-                });
-            }
-        }
-    }
+    // Ping-pong index sequence: 0, 1, 2, 3, 4, 3, 2, 1
+    // (Assuming max 5 levels, if less, adjust)
+    const levelSequence = [];
+    for (let i = 0; i < grids.length; i++) levelSequence.push(i);
+    for (let i = grids.length - 2; i > 0; i--) levelSequence.push(i);
+    if (levelSequence.length === 0) levelSequence.push(0);
 
-    // ── Ball ──
-    const ballR = 5;
+    const totalFrames = levelSequence.length * framesPerLevel;
+    const frames = [];
+    const allBrickEvents = []; 
+    // We'll track events per level. allBrickEvents[lvlIndex] = [{row, col, hp}]
+
+    let ballR = 5;
     let ballX = width / 2;
     let ballY = height - 50;
-    const baseSpeed = 320;
-    let speed = baseSpeed;
-    let angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.4;
-    let ballDx = Math.cos(angle) * speed;
-    let ballDy = Math.sin(angle) * speed;
+    let paddleW = 80;
+    const paddleH = 10;
+    const paddleY = height - 25;
+    let paddleX = ballX - paddleW / 2;
 
-    // ── Paddle ──
-    let paddleW = 90;
-    const paddleH = 12;
-    let paddleX = (width - paddleW) / 2;
-    const paddleY = height - 35;
-
-    let score = 0;
-
-    const frames = [];
-
-    // ── Simulation loop ──
-    let bricksDestroyed = 0;
+    let totalScore = 0;
     
-    for (let frame = 0; frame < totalFrames; frame++) {
-        const brickChanges = [];
+    // We also need to return layout info
+    const cols = grids[0]?.[0]?.length || 52;
+    const rows = 7;
+    const totalWidth = cols * brickW + (cols - 1) * brickGap;
+    const startX = (width - totalWidth) / 2;
 
-        // — Grid Descending Logic (Soft Floor + Pressure Zone) —
-        const dropSpeedBase = Math.min(20, 2 + bricksDestroyed * 0.1);
-        let closestDist = 9999;
+    for (let seqIndex = 0; seqIndex < levelSequence.length; seqIndex++) {
+        const gridIndex = levelSequence[seqIndex];
+        const grid = grids[gridIndex];
         
-        for (const brick of bricks) {
-            if (!brick.alive) continue;
-            const dist = paddleY - (brick.y + brick.h);
-            if (dist < closestDist) closestDist = dist;
-        }
-
-        let actualSpeed = dropSpeedBase;
-        if (closestDist < 100) {
-            actualSpeed *= Math.max(0.1, (closestDist - 10) / 90);
-        }
-
-        const dy = actualSpeed * dt;
-        topPadding += dy;
-        for (const brick of bricks) {
-            brick.y += dy;
-        }
-
-        // — AI paddle: follow ball with slight lag —
-        const targetX = ballX - paddleW / 2;
-        paddleX += (targetX - paddleX) * 0.08;
-        paddleX = Math.max(0, Math.min(width - paddleW, paddleX));
-
-        // — Move ball —
-        ballX += ballDx * dt;
-        ballY += ballDy * dt;
-
-        // — Wall collisions —
-        if (ballX - ballR <= 0) {
-            ballX = ballR;
-            ballDx = Math.abs(ballDx);
-        }
-        if (ballX + ballR >= width) {
-            ballX = width - ballR;
-            ballDx = -Math.abs(ballDx);
-        }
-        if (ballY - ballR <= 0) {
-            ballY = ballR;
-            ballDy = Math.abs(ballDy);
-        }
-
-        // — Paddle collision —
-        if (
-            ballDy > 0 &&
-            ballY + ballR >= paddleY &&
-            ballY - ballR <= paddleY + paddleH &&
-            ballX >= paddleX &&
-            ballX <= paddleX + paddleW
-        ) {
-            const hitPos = (ballX - paddleX) / paddleW;
-            const reflectAngle = -Math.PI / 2 + (hitPos - 0.5) * 2 * (Math.PI / 3);
-            ballDx = Math.cos(reflectAngle) * speed;
-            ballDy = Math.sin(reflectAngle) * speed;
-            ballY = paddleY - ballR - 1;
-        }
-
-        // — Bottom reset (AI doesn't miss often, but just in case) —
-        if (ballY + ballR > height) {
-            ballY = height - 50;
-            ballX = width / 2;
-            angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.4;
-            ballDx = Math.cos(angle) * speed;
-            ballDy = Math.sin(angle) * speed;
-        }
-
-        // — Brick collisions —
-        for (const brick of bricks) {
-            if (!brick.alive) continue;
-
-            if (
-                ballX + ballR > brick.x &&
-                ballX - ballR < brick.x + brick.w &&
-                ballY + ballR > brick.y &&
-                ballY - ballR < brick.y + brick.h
-            ) {
-                // Determine side
-                const overlapLeft = (ballX + ballR) - brick.x;
-                const overlapRight = (brick.x + brick.w) - (ballX - ballR);
-                const overlapTop = (ballY + ballR) - brick.y;
-                const overlapBottom = (brick.y + brick.h) - (ballY - ballR);
-                const minX = Math.min(overlapLeft, overlapRight);
-                const minY = Math.min(overlapTop, overlapBottom);
-
-                if (minX < minY) {
-                    ballDx = -ballDx;
-                } else {
-                    ballDy = -ballDy;
+        let topPadding = topPaddingBase;
+        const bricks = [];
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                const hp = grid[r][c] || 0;
+                if (hp > 0) {
+                    bricks.push({
+                        id: `${seqIndex}-${r}-${c}`, // Unique per sequence so it can respawn
+                        gridIndex,
+                        row: r, col: c,
+                        x: startX + c * (brickW + brickGap),
+                        y: topPadding + r * (brickH + brickGap),
+                        w: brickW, h: brickH,
+                        hp, maxHp: hp, alive: true,
+                    });
                 }
-
-                brick.hp--;
-                score += 10 * brick.maxHp;
-
-                if (brick.hp <= 0) {
-                    brick.alive = false;
-                    bricksDestroyed++;
-                }
-
-                brickChanges.push({
-                    row: brick.row,
-                    col: brick.col,
-                    hp: brick.hp,
-                });
-
-                // Speed up slightly
-                speed = Math.min(baseSpeed * 1.5, speed + 0.3);
-                const mag = Math.sqrt(ballDx * ballDx + ballDy * ballDy);
-                ballDx = (ballDx / mag) * speed;
-                ballDy = (ballDy / mag) * speed;
-
-                break; // One collision per frame
             }
         }
 
-        frames.push({
-            ballX: Math.round(ballX * 10) / 10,
-            ballY: Math.round(ballY * 10) / 10,
-            paddleX: Math.round(paddleX * 10) / 10,
-            paddleW,
-            score,
-            brickChanges,
-        });
-    }
+        const totalBricks = bricks.length;
+        let bricksDestroyed = 0;
+        let baseSpeed = 500;
+        let speed = baseSpeed;
+        let angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.4;
+        let ballDx = Math.cos(angle) * speed;
+        let ballDy = Math.sin(angle) * speed;
 
-    // Build final brick state map
-    const brickStates = new Map();
-    for (const brick of bricks) {
-        brickStates.set(`${brick.row}-${brick.col}`, {
-            ...brick,
-            alive: brick.alive,
-            hp: brick.hp,
-        });
+        // Simulate one level
+        for (let frame = 0; frame < framesPerLevel; frame++) {
+            const brickChanges = [];
+
+            if (bricksDestroyed < totalBricks) {
+                const dropSpeedBase = 10 + (frame / framesPerLevel) * 30; 
+                let closestDist = 9999;
+                for (const brick of bricks) {
+                    if (!brick.alive) continue;
+                    const dist = paddleY - (brick.y + brick.h);
+                    if (dist < closestDist) closestDist = dist;
+                }
+
+                let actualSpeed = dropSpeedBase;
+                if (closestDist < 80) actualSpeed *= Math.max(0.01, (closestDist - 15) / 65); 
+                
+                const dy = actualSpeed * dt;
+                topPadding += dy;
+                for (const brick of bricks) { brick.y += dy; }
+            }
+
+            if (frame > framesPerLevel * 0.4) {
+                speed *= 1.05; 
+            }
+            const piercingMode = frame > (framesPerLevel * 0.8) && bricksDestroyed < totalBricks;
+            
+            const steps = Math.ceil(speed * dt / (brickW * 0.8));
+            const subDt = dt / steps;
+
+            for (let s = 0; s < steps; s++) {
+                ballX += ballDx * subDt;
+                ballY += ballDy * subDt;
+
+                paddleX = ballX - paddleW / 2;
+                paddleX = Math.max(0, Math.min(width - paddleW, paddleX));
+
+                if (ballX - ballR <= 0) { ballX = ballR; ballDx = Math.abs(ballDx); }
+                if (ballX + ballR >= width) { ballX = width - ballR; ballDx = -Math.abs(ballDx); }
+                if (ballY - ballR <= 0) { ballY = ballR; ballDy = Math.abs(ballDy); }
+
+                if (ballY + ballR >= paddleY) {
+                    ballY = paddleY - ballR - 1;
+                    const hitPos = (ballX - paddleX) / paddleW;
+                    const reflectAngle = -Math.PI / 2 + (hitPos - 0.5) * 2 * (Math.PI / 3) + (Math.random() - 0.5) * 0.1;
+                    ballDx = Math.cos(reflectAngle) * speed;
+                    ballDy = -Math.abs(Math.sin(reflectAngle) * speed); 
+                }
+
+                for (const brick of bricks) {
+                    if (!brick.alive) continue;
+
+                    if (
+                        ballX + ballR > brick.x && ballX - ballR < brick.x + brick.w &&
+                        ballY + ballR > brick.y && ballY - ballR < brick.y + brick.h
+                    ) {
+                        if (!piercingMode) {
+                            const overlapX = ballDx > 0 ? (ballX + ballR) - brick.x : (brick.x + brick.w) - (ballX - ballR);
+                            const overlapY = ballDy > 0 ? (ballY + ballR) - brick.y : (brick.y + brick.h) - (ballY - ballR);
+                            if (overlapX < overlapY) ballDx *= -1; else ballDy *= -1;
+                        }
+
+                        const damage = piercingMode ? brick.hp : 1;
+                        brick.hp -= damage;
+                        totalScore += 10 * damage;
+
+                        if (brick.hp <= 0) {
+                            brick.alive = false;
+                            bricksDestroyed++;
+                        }
+                        brickChanges.push({ id: brick.id, hp: brick.hp });
+                        if (!piercingMode) break; 
+                    }
+                }
+            }
+
+            frames.push({
+                activeLevel: seqIndex,
+                gridIndex, // 0 to max 4
+                ballX: Math.round(ballX * 10) / 10,
+                ballY: Math.round(ballY * 10) / 10,
+                paddleX: Math.round(paddleX * 10) / 10,
+                paddleW,
+                score: totalScore,
+                brickChanges,
+                levelProgress: frame / framesPerLevel,
+                topPaddingOffset: topPadding - topPaddingBase
+            });
+
+            if (bricksDestroyed >= totalBricks) {
+                ballDx *= 0.95;
+                ballDy *= 0.95;
+                speed = Math.max(200, speed * 0.95);
+            }
+        }
     }
 
     return {
         frames,
-        brickStates,
-        finalScore: score,
-        brickLayout: { rows, cols, brickW, brickH, brickGap, gridPadding, topPadding, startX, topPaddingOffset: topPadding - 50 },
+        levelSequence,
+        finalScore: totalScore,
+        brickLayout: { rows, cols, brickW, brickH, brickGap, gridPadding: 16, topPaddingBase, startX },
     };
 }

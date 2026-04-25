@@ -23,7 +23,7 @@ const OUTPUT_DIR = join(__dirname, '..', 'output');
 
 // ── Configuration ──
 const CONFIG = {
-    username: process.env.GITHUB_USERNAME || 'anoojshete',
+    username: process.env.GITHUB_USERNAME || 'techno-rax',
     token: process.env.GITHUB_TOKEN || '',
     width: 800,
     height: 450,

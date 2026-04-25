@@ -142,7 +142,7 @@ export function showWin(score, elapsed) {
 }
 
 export function getUsername() {
-    return el.usernameInput?.value?.trim() || 'anoojshete';
+    return el.usernameInput?.value?.trim() || 'techno-rax';
 }
 
 export function updateSoundButton(muted) {

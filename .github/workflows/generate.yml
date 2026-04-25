@@ -25,7 +25,7 @@ jobs:
         run: node generator/generate.js
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-          GITHUB_USERNAME: ${{ vars.GITHUB_USERNAME || 'anoojshete' }}
+          GITHUB_USERNAME: ${{ vars.GITHUB_USERNAME || 'techno-rax' }}
 
       - name: 📤 Commit and push
         run: |

@@ -40,11 +40,9 @@ export function generateGrid(data, canvasWidth, canvasHeight, options = {}) {
     const cols = data[0]?.length || 0;
     if (rows === 0 || cols === 0) return { bricks, spatialGrid: [], gridInfo: {} };
 
-    const gridPadding = 16;
-    const brickGap = 3; // Standard GitHub gap
-    const availableWidth = canvasWidth - gridPadding * 2;
-    // Force square bricks based on columns
-    const brickSize = Math.floor((availableWidth - (cols - 1) * brickGap) / cols);
+    // Force exact GitHub-style dimensions
+    const brickSize = 11;
+    const brickGap = 2; 
     const brickWidth = brickSize;
     const brickHeight = brickSize;
     
@@ -149,26 +147,44 @@ export function nearbyBricks(bx, by, br, gridInfo, spatialGrid) {
  * @returns {number[][]}
  */
 export function generateDemoGrid() {
-    const grid = [];
-    for (let row = 0; row < 7; row++) {
-        const rowData = [];
-        for (let col = 0; col < 52; col++) {
-            const r = Math.random();
-            const dayFactor = (row === 0 || row === 6) ? 0.6 : 1;
-            const timeFactor = Math.sin((col / 52) * Math.PI * 2 + 1) * 0.3 + 0.7;
-            const streakFactor = (col > 20 && col < 35) ? 1.3 : 1;
-            const p = r * dayFactor * timeFactor * streakFactor;
-
-            let hp = 0;
-            if (p > 0.8) hp = 4;
-            else if (p > 0.6) hp = 3;
-            else if (p > 0.4) hp = 2;
-            else if (p > 0.2) hp = 1;
-            rowData.push(hp);
+    function generateSingleYear(y) {
+        const grid = [];
+        for (let row = 0; row < 7; row++) {
+            const rowData = [];
+            for (let col = 0; col < 52; col++) {
+                const r = Math.random();
+                const dayFactor = (row === 0 || row === 6) ? 0.6 : 1;
+                const timeFactor = Math.sin((col / 52) * Math.PI * 2 + (y * 0.5)) * 0.4 + 0.6;
+                const streakFactor = (col > 20 && col < 35) ? 1.3 : 1;
+                const p = r * dayFactor * timeFactor * streakFactor;
+                let hp = 0;
+                if (p > 0.8) hp = 4;
+                else if (p > 0.6) hp = 3;
+                else if (p > 0.4) hp = 2;
+                else if (p > 0.2) hp = 1;
+                rowData.push(hp);
+            }
+            grid.push(rowData);
         }
-        grid.push(rowData);
+        return grid;
     }
-    return grid;
+
+    const currentYear = new Date().getFullYear();
+    const yearsData = [];
+    for (let i = 0; i < 5; i++) {
+        yearsData.push({
+            year: currentYear - i,
+            totalContributions: 800 - i * 50,
+            grid: generateSingleYear(currentYear - i)
+        });
+    }
+
+    return { 
+        grid: yearsData[0].grid, 
+        totalContributions: yearsData[0].totalContributions,
+        years: yearsData,
+        totalAllTime: 3500
+    };
 }
 
 /**

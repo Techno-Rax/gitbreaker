@@ -58,6 +58,7 @@ async function fetchFromPublicPage(username) {
     return {
         grid,
         totalContributions: data.total?.lastYear || countTotal(grid),
+        years: [{ year: new Date().getFullYear(), grid }]
     };
 }
 
@@ -67,29 +68,48 @@ async function fetchFromPublicPage(username) {
  * @param {string} username
  */
 async function fetchFromProxy(username) {
-    // This would point to a Vercel serverless function
-    const proxyUrl = `https://gitbreaker-api.vercel.app/api/contributions?username=${encodeURIComponent(username)}`;
+    const isLocal = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+    const proxyUrl = isLocal 
+        ? `http://localhost:3000/api/contributions?username=${encodeURIComponent(username)}`
+        : `https://gitbreaker-api.vercel.app/api/contributions?username=${encodeURIComponent(username)}`;
 
-    const response = await fetch(proxyUrl);
-    if (!response.ok) throw new Error(`Proxy returned ${response.status}`);
+    try {
+        const response = await fetch(proxyUrl);
+        if (!response.ok) throw new Error(`Proxy returned ${response.status}`);
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (data.weeks) {
-        return {
-            grid: weeksToGrid(data.weeks),
-            totalContributions: data.totalContributions || 0,
-        };
+        // New V2.3 format with years array
+        if (data.years && data.years.length > 0) {
+            return {
+                grid: data.grid,
+                totalContributions: data.totalAllTime || countTotal(data.grid),
+                years: data.years
+            };
+        }
+
+        // Backward compatibility
+        if (data.weeks) {
+            const grid = weeksToGrid(data.weeks);
+            return {
+                grid,
+                totalContributions: data.totalContributions || 0,
+                years: [{ year: new Date().getFullYear(), grid }]
+            };
+        }
+
+        if (data.grid) {
+            return {
+                grid: data.grid,
+                totalContributions: data.totalContributions || 0,
+                years: [{ year: new Date().getFullYear(), grid: data.grid }]
+            };
+        }
+
+        throw new Error('Invalid proxy response format');
+    } catch(err) {
+        throw err;
     }
-
-    if (data.grid) {
-        return {
-            grid: data.grid,
-            totalContributions: data.totalContributions || 0,
-        };
-    }
-
-    throw new Error('Invalid proxy response format');
 }
 
 /**

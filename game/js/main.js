@@ -23,7 +23,7 @@ class Game {
         window.addEventListener('resize', () => this._resize());
 
         this.state = State.MENU;
-        this.username = 'anoojshete';
+        this.username = 'techno-rax';
 
         /** @type {Ball[]} */
         this.balls = [];
@@ -144,6 +144,39 @@ class Game {
             this._startGame(generateDemoGrid(), true);
         });
 
+        // --- Export Feature ---
+        const updateExportCode = () => {
+            const theme = document.getElementById('export-theme').value;
+            const domain = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                ? 'https://gitbreaker.vercel.app' 
+                : window.location.origin;
+            const user = this.username && this.username !== 'demo' ? this.username : 'techno-rax';
+            const code = `[![CommitBreaker](${domain}/api/svg?user=${user}&theme=${theme})](https://techno-rax.github.io/gitbreaker/)`;
+            document.getElementById('export-code').value = code;
+        };
+
+        document.getElementById('export-btn')?.addEventListener('click', () => {
+            updateExportCode();
+            document.getElementById('export-modal').classList.remove('hidden');
+        });
+
+        document.getElementById('close-export-btn')?.addEventListener('click', () => {
+            document.getElementById('export-modal').classList.add('hidden');
+        });
+
+        document.getElementById('export-theme')?.addEventListener('change', updateExportCode);
+
+        document.getElementById('copy-export-btn')?.addEventListener('click', () => {
+            const codeEl = document.getElementById('export-code');
+            codeEl.select();
+            document.execCommand('copy');
+            const btn = document.getElementById('copy-export-btn');
+            const ogText = btn.innerText;
+            btn.innerText = 'copied!';
+            setTimeout(() => btn.innerText = ogText, 2000);
+        });
+        // ----------------------
+
         document.getElementById('restart-btn')?.addEventListener('click', () => this._restartGame());
         document.getElementById('win-restart-btn')?.addEventListener('click', () => this._restartGame());
         document.getElementById('resume-btn')?.addEventListener('click', () => {
@@ -237,25 +270,35 @@ class Game {
         UI.setStatus('fetching...');
 
         try {
-            const { grid, totalContributions } = await fetchContributions(username);
-            console.log(`Loaded ${totalContributions} contributions`);
-            this._startGame(grid, true);
+            const data = await fetchContributions(username);
+            console.log(`Loaded ${data.totalAllTime} all-time contributions across ${data.years.length} years`);
+            this._startGame(data.years, true);
         } catch (err) {
             console.warn('API failed, using demo:', err.message);
-            this._startGame(generateDemoGrid(), true);
+            const { generateDemoGrid } = await import('./grid.js');
+            const data = generateDemoGrid();
+            this._startGame(data.years, true);
         }
     }
 
-    _startGame(gridData, isHpData = false) {
-        this.state = State.PLAYING;
+    _startGame(yearsData, isHpData = false) {
         UI.setStatus('running');
+
+        // Ping-pong timeline sequence
+        this.yearsData = yearsData || [{ year: new Date().getFullYear(), grid: generateDemoGrid().years[0].grid }];
+        this.levelSequence = [];
+        for (let i = 0; i < this.yearsData.length; i++) this.levelSequence.push(i);
+        for (let i = this.yearsData.length - 2; i > 0; i--) this.levelSequence.push(i);
+        if (this.levelSequence.length === 0) this.levelSequence.push(0);
+
+        this.currentSeqIndex = 0;
 
         // Reset
         this.score = 0;
         this.lives = 3;
         this.combo = 0;
         this.maxCombo = 0;
-        this.bricksDestroyedCount = 0;
+        this.totalBricksDestroyed = 0;
         this.startTime = performance.now();
         this.comboTimer = 0;
         this.streakCombo = 0;
@@ -269,7 +312,29 @@ class Game {
         this.paddle = new Paddle(this.canvas.width, this.canvas.height);
         this.paddle.gravityDir = 1;
 
-        // Ball
+        // Reset systems
+        this.powerUps.reset();
+        this.particles.reset();
+
+        this._loadLevel(this.currentSeqIndex, isHpData);
+
+        // UI
+        UI.hideAllScreens();
+        UI.updateScore(0);
+        UI.updateLives(this.lives);
+        UI.updateUsername(this.username);
+        UI.updateGravity(1);
+        
+        // Start game loop safely
+        this.state = State.PLAYING;
+    }
+
+    _loadLevel(seqIndex, isHpData) {
+        const gridIndex = this.levelSequence[seqIndex];
+        const yearData = this.yearsData[gridIndex];
+        const gridData = yearData.grid;
+
+        // Reset ball
         this.balls = [];
         const ball = this.createBall();
         ball.gravity = this.baseGravity;
@@ -279,37 +344,30 @@ class Game {
         // Bricks — with spatial grid
         const result = generateGrid(gridData, this.canvas.width, this.canvas.height, {
             isHpData,
-            topPadding: 50,
+            topPadding: -200, // Slide in from top
         });
+        
         this.bricks = result.bricks;
         this.spatialGrid = result.spatialGrid;
         this.gridInfo = result.gridInfo;
         this.totalBricks = this.bricks.length;
+        this.bricksDestroyedCount = 0;
 
-        // Reset systems
-        this.powerUps.reset();
-        this.particles.reset();
-
-        // UI
-        UI.hideAllScreens();
-        UI.updateScore(0);
-        UI.updateLives(this.lives);
-        UI.updateUsername(this.username);
-        UI.updateGravity(1);
+        UI.setStatus(`Year: ${yearData.year}`);
     }
-
     createBall() {
         return new Ball(this.canvas.width / 2, this.canvas.height - 50, 5);
     }
 
     _restartGame() {
         if (this.username === 'demo') {
-            this._startGame(generateDemoGrid(), true);
+            import('./grid.js').then(m => {
+                this._startGame(m.generateDemoGrid().years, true);
+            });
         } else {
             this._startWithContributions(this.username);
         }
     }
-
     // ── Game Loop (FPS capped) ──
     _startLoop() {
         const loop = (timestamp) => {
@@ -478,13 +536,24 @@ class Game {
             }
         }
 
-        // ── Win check ──
+        // ── Win / Level Transition check ──
         const alive = this.bricks.filter(b => b.alive).length;
         if (alive === 0 && this.totalBricks > 0) {
-            this.state = State.WIN;
-            this.sound.win();
-            UI.showWin(this.score, (performance.now() - this.startTime) / 1000);
-            this.confettiTimer = 3;
+            if (this.currentSeqIndex < this.levelSequence.length - 1) {
+                // Next ping-pong timeline level
+                this.currentSeqIndex++;
+                this.sound.win(); // Little chime for timeline shift
+                this.particles.emitConfetti(this.canvas.width / 2, this.canvas.height / 2);
+                this._loadLevel(this.currentSeqIndex, true);
+            } else {
+                // Game actually won
+                this.state = State.WIN;
+                this.sound.win();
+                import('./ui.js').then(UI => {
+                    UI.showWin(this.score, (performance.now() - this.startTime) / 1000);
+                });
+                this.confettiTimer = 3;
+            }
         }
 
         // ── Win confetti ──
