@@ -11,7 +11,7 @@ export function simulate(grids, options = {}) {
     const brickH = 11;
     const brickGap = 2;
     const gridPadding = 16;
-    const topPaddingBase = 45;
+    const topPaddingBase = 15;
 
     // Ping-pong index sequence: 0, 1, 2, 3, 4, 3, 2, 1
     // (Assuming max 5 levels, if less, adjust)

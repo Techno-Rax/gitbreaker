@@ -17,7 +17,7 @@ export default async function handler(req, res) {
             grids = data.years.map(y => y.grid);
         }
 
-        const height = compact ? 260 : 340;
+        const height = 170;
 
         const simResult = simulate(grids, { 
             width: 800, 
@@ -28,7 +28,6 @@ export default async function handler(req, res) {
         const svgString = renderSVG(simResult, 800, height, grids, { 
             username,
             theme,
-            compact
         });
 
         res.setHeader('Content-Type', 'image/svg+xml');
@@ -39,9 +38,9 @@ export default async function handler(req, res) {
         console.error('Error generating SVG:', err);
         const data = generateDemoGrid();
         const grids = data.years.map(y => y.grid);
-        const height = compact ? 260 : 340;
+        const height = 170;
         const simResult = simulate(grids, { width: 800, height, framesPerLevel: 120 });
-        const svgString = renderSVG(simResult, 800, height, grids, { username: 'Error - Demo', theme, compact });
+        const svgString = renderSVG(simResult, 800, height, grids, { username: 'Error - Demo', theme });
         
         res.setHeader('Content-Type', 'image/svg+xml');
         res.setHeader('Cache-Control', 'public, s-maxage=60');

@@ -1,66 +1,133 @@
 <div align="center">
 
-# GitBreaker
+# 🎮 GitBreaker
 
-<!-- [INSERT YOUR SVG LINK HERE] e.g., <img src="..." alt="CommitBreaker SVG" /> -->
+<img src="https://raw.githubusercontent.com/techno-rax/gitbreaker/main/output/game.svg" alt="GitBreaker SVG Animation" />
 
-**An interactive arcade engine generated dynamically from GitHub contribution heatmaps.**
+**Turn GitHub contributions into a playable arcade game.**
 
 </div>
 
-## Overview
+---
 
-GitBreaker merges gamification with GitHub activity data. It translates a developer's repository contribution heatmap into a multi-layered, fully playable brick-breaker physics simulation. The architecture serves both as a live browser-based arcade game and an autonomous, invincible SVG simulation engine designed specifically for developer profile readmes.
+## 🧠 Overview
 
-## Core Architecture
+GitBreaker transforms a developer’s GitHub contribution heatmap into an interactive brick-breaker game.
 
-GitBreaker is engineered without external node modules for the client, utilizing vanilla JavaScript and native Browser APIs for maximal performance. The data pipeline leverages Vercel Serverless Functions to securely proxy GitHub GraphQL requests.
+Each day becomes a brick. More contributions = stronger bricks.
 
-- **Multi-Year Timelines**: Aggregates up to five contiguous years of contribution history into physical gameplay layers.
-- **Physical Timeline Progression**: Completing a chronological layer physically transitions the engine into the subsequent parsed year in a ping-pong chronological flow.
-- **Autonomous Sub-Stepping Physics**: The headless simulation engine interpolates sub-steps for physical intersections to mathematically guarantee a flawless board clearance for SVG generation.
-- **Dynamic Theming Support**: Integrates synchronized palette themes matching the GitHub ecosystem (Dark, Light, Dracula, Outrun).
+It runs in two modes:
 
-## Structure
+* 🎮 **Playable web game** (Canvas-based)
+* 🎬 **Autonomous SVG simulation** (for READMEs & profiles)
 
-The infrastructure is split into dual execution models:
+---
 
-- `/game`: The front-end client interface. Contains the collision tree, HTML5 Canvas renderer, and the unified event loop.
-- `/generator`: The headless simulation infrastructure. Parses historical timelines from the API proxy and synthesizes exact frame keyframes into raw animated SVG code.
-- `/api`: Vercel edge endpoints handling GitHub authentication, data aggregation via GraphQL aliases, and raw SVG transmission.
+## ⚙️ Core Concepts
 
-## Local Development Setup
+* **Contribution → Gameplay Mapping**
+  Each cell in the GitHub heatmap becomes a brick with HP based on activity.
 
-No standard package managers are required to develop or extend the core visualization engine. 
+* **Deterministic Simulation Engine**
+  The generator produces a fully reproducible playthrough for SVG rendering.
 
-1. Clone the repository.
-   ```bash
-   git clone https://github.com/techno-rax/gitbreaker.git
-   cd gitbreaker
+* **Zero Dependency Runtime**
+  Built using vanilla JavaScript and browser APIs — no frameworks, no build step.
+
+* **Serverless Data Pipeline**
+  GitHub data is fetched securely using Vercel serverless functions.
+
+---
+
+## 🏗️ Architecture
+
+```id="3m3lqk"
+gitbreaker/
+├── game/        # Playable Canvas game
+├── generator/   # SVG simulation engine
+├── api/         # Vercel serverless functions
+├── output/      # Generated SVG
+```
+
+### Execution Layers
+
+* **Client (`/game`)**
+
+  * HTML5 Canvas renderer
+  * Input system (mouse, keyboard, touch)
+  * Real-time physics + collision
+
+* **Simulation (`/generator`)**
+
+  * Headless deterministic engine
+  * Frame-by-frame SVG keyframe generation
+
+* **API (`/api`)**
+
+  * GitHub GraphQL proxy
+  * Contribution aggregation
+  * SVG endpoint
+
+---
+
+## 🚀 Local Development
+
+```bash id="jz9h2v"
+git clone https://github.com/techno-rax/gitbreaker.git
+cd gitbreaker
+```
+
+### 1. Set environment variable
+
+```bash id="b2cn6x"
+GITHUB_TOKEN=your_personal_access_token
+```
+
+### 2. Run locally
+
+```bash id="n6fh0k"
+npx vercel dev
+```
+
+* Game: http://localhost:3000
+* SVG API: http://localhost:3000/api/svg
+
+---
+
+## 🌐 Deployment
+
+Optimized for Vercel:
+
+1. Import repo into Vercel
+2. Add environment variable:
+
    ```
-
-2. Establish environmental variables.
-   You must map a GitHub Personal Access Token to bypass unauthenticated GraphQL rate limits. Create a local `.env` file or export the variable into your terminal session.
-   ```bash
-   GITHUB_TOKEN=your_personal_access_token
+   GITHUB_TOKEN
    ```
+3. Deploy
 
-3. Initialize the development server.
-   The project is configured for Vercel's integrated local development environment.
-   ```bash
-   npx vercel dev
-   ```
+Routing is handled via `vercel.json`.
 
-The live web game will be accessible at `http://localhost:3000`, while the unauthenticated SVG renderer endpoints are exposed at `http://localhost:3000/api/svg`.
+---
 
-## Production Deployment
+## 🔐 Security
 
-GitBreaker is structurally configured for zero-configuration deployments via Vercel. 
+* GitHub tokens are never exposed client-side
+* All API calls are proxied through serverless functions
+* CI includes static analysis (CodeQL)
 
-1. Import the repository into the Vercel Dashboard.
-2. Bind the `GITHUB_TOKEN` variable directly into your environment secrets.
-3. Deploy. The `vercel.json` natively routes `/api/*` to the serverless infrastructure while statically hosting the `/game` client tree.
+---
 
-## Security 
+## ✨ Highlights
 
-The repository utilizes continuous integration pipelines leveraging native GitHub Action workflows. Pushes are statically analyzed via CodeQL to audit structural application stability prior to integration.
+* No dependencies
+* Deterministic physics engine
+* Works in README via SVG
+* Real GitHub data as gameplay
+* Lightweight and fast
+
+---
+
+## 📜 License
+
+MIT © techno-rax

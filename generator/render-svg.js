@@ -140,14 +140,7 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
     for (let x = 0; x < width; x += 40) svg += `  <line x1="${x}" y1="0" x2="${x}" y2="${height}" stroke="${t.lines}" stroke-width="1"/>\n`;
     for (let y = 0; y < height; y += 40) svg += `  <line x1="0" y1="${y}" x2="${width}" y2="${y}" stroke="${t.lines}" stroke-width="1"/>\n`;
 
-    if (!compact) {
-        svg += `  <text x="${width / 2}" y="22" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="600" text-anchor="middle" fill="${t.text}">`;
-        svg += `CommitBreaker <tspan fill="${t.accent}">— ${username}</tspan></text>\n`;
-        // We will just show final score, or no score if it updates 
-        svg += `  <text x="${width - 15}" y="22" font-family="monospace" font-size="10" text-anchor="end" fill="${t.accent}" opacity="0.8">PING-PONG TIMELINE</text>\n`;
-    }
-
-    const tPad = compact ? 15 : 45;
+    const tPad = 15;
 
     // Render every ping-pong level iteration in its own sliding group
     for (let seqIndex = 0; seqIndex < levelSequence.length; seqIndex++) {
@@ -183,13 +176,6 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
     svg += `  <rect class="paddle" x="${frames[0].paddleX}" y="${paddleY}" width="${frames[0].paddleW}" height="${paddleH}" fill="${t.paddle}" rx="${paddleH/2}"/>\n`;
     svg += `  <circle class="ball" cx="${frames[0].ballX}" cy="${frames[0].ballY}" r="${ballR}" fill="${t.ball}"/>\n`;
     
-    if (!compact) {
-        svg += `  <a href="https://techno-rax.github.io/gitbreaker" target="_blank">\n`;
-        svg += `    <rect x="${width/2 - 45}" y="${height - 20}" width="90" height="16" rx="8" fill="${t.bg}" stroke="${t.accent}" stroke-width="1"/>\n`;
-        svg += `    <text x="${width/2}" y="${height - 9}" fill="${t.accent}" font-family="sans-serif" font-size="9" font-weight="600" text-anchor="middle">▶ Play Game</text>\n`;
-        svg += `  </a>\n`;
-    }
-
     svg += `</svg>\n`;
     return svg;
 }
