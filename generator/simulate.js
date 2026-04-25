@@ -79,7 +79,7 @@ export function simulate(grids, options = {}) {
             // Bricks no longer descend
 
             if (frame > framesPerLevel * 0.4) {
-                speed *= 1.05; 
+                speed = baseSpeed * 1.5; 
             }
             const piercingMode = frame > (framesPerLevel * 0.8) && bricksDestroyed < totalBricks;
             
@@ -90,7 +90,14 @@ export function simulate(grids, options = {}) {
                 ballX += ballDx * subDt;
                 ballY += ballDy * subDt;
 
-                paddleX = ballX - paddleW / 2;
+                const targetPaddleX = ballX - paddleW / 2;
+                // Add some smooth wandering that stays within the paddle width bounds to look less robotic
+                const wander = Math.sin(frame * 0.15) * (paddleW * 0.3) + Math.cos(frame * 0.05) * (paddleW * 0.1);
+                
+                // Snap closer if ball is dangerously close
+                const danger = Math.max(0, 1 - (paddleY - ballY) / 60);
+                
+                paddleX += (targetPaddleX + wander * (1 - danger) - paddleX) * 0.3;
                 paddleX = Math.max(0, Math.min(width - paddleW, paddleX));
 
                 if (ballX - ballR <= 0) { ballX = ballR; ballDx = Math.abs(ballDx); }
