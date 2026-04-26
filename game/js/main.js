@@ -391,7 +391,9 @@ class Game {
         // Bricks — with spatial grid
         const result = generateGrid(gridData, this.canvas.width, this.canvas.height, {
             isHpData,
-            topPadding: 40,
+            topPadding: 60, // Give the ball more room at the top
+            stretchToFit: true, // Instruct grid.js to fill the screen
+            brickGap: this.canvas.width > 800 ? 4 : 2 // Dynamically widen gaps
         });
 
         this.bricks = result.bricks;
@@ -489,14 +491,24 @@ class Game {
     }
     // ── Game Loop (FPS capped) ──
     _startLoop() {
+        const fixedDt = 1 / this.targetFPS; // 1/60th of a second
+        const gameSpeedMultiplier = 1.35; // Increase this to make the game faster
+
         const loop = (timestamp) => {
-            const rawDt = Math.min((timestamp - this.lastTime) / 1000, 0.05);
+            // Cap max delta to prevent death spirals on lag spikes
+            let rawDt = Math.min((timestamp - this.lastTime) / 1000, 0.1); 
             this.lastTime = timestamp;
 
             if (this.state === State.PLAYING) {
-                const dt = rawDt * this.slowMoFactor;
-                this.gameTime += dt;
-                this._update(dt);
+                this.accumulator += rawDt * gameSpeedMultiplier;
+
+                // Fixed timestep loop for consistent physics speeds
+                while (this.accumulator >= fixedDt) {
+                    const dt = fixedDt * this.slowMoFactor;
+                    this.gameTime += dt;
+                    this._update(dt);
+                    this.accumulator -= fixedDt;
+                }
             }
 
             this._render();

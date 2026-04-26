@@ -93,7 +93,7 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
     svg += `    @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }\n`;
 
     // Drop precision for speed
-    const step = Math.max(1, Math.floor(frames.length / 150));
+    const step = Math.max(1, Math.floor(frames.length / 400)); 
     svg += `    @keyframes ballMove {\n`;
     for (let i = 0; i < frames.length; i += step) {
         const pct = ((i / (frames.length - 1)) * 100).toFixed(1);

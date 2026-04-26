@@ -8,10 +8,12 @@ export function simulate(grids, options = {}) {
     } = options;
 
     const dt = 1 / fps;
-    let brickW = 11;
+    
+    // Fix: Reduced base width and increased top padding for better ball clearance
+    let brickW = 10; 
     let brickGap = width < 760 ? 1 : 2;
     const gridPadding = 16;
-    const topPaddingBase = 15;
+    const topPaddingBase = 35; 
 
     // Ping-pong index sequence: 0, 1, 2, 3, 4, 3, 2, 1
     // (Assuming max 5 levels, if less, adjust)
@@ -39,10 +41,12 @@ export function simulate(grids, options = {}) {
     const cols = grids[0]?.[0]?.length || 52;
     const rows = 7;
 
-    // Scale brick size down for narrower presets while preserving a minimum side gutter.
-    const requestedSidePadding = Math.max(0, Math.floor(sidePadding));
+    // Fix: Force a minimum side gap so the ball (radius 5) can always pass
+    const minRequiredPadding = ballR * 4; 
+    const requestedSidePadding = Math.max(minRequiredPadding, Math.floor(sidePadding));
     const availableWidth = Math.max(360, width - requestedSidePadding * 2);
-    while (brickW > 7 && (brickW * cols + (cols - 1) * brickGap) > availableWidth) {
+    
+    while (brickW > 5 && (brickW * cols + (cols - 1) * brickGap) > availableWidth) {
         brickW -= 1;
     }
     if ((brickW * cols + (cols - 1) * brickGap) > availableWidth && brickGap > 1) {
@@ -94,8 +98,6 @@ export function simulate(grids, options = {}) {
         for (let frame = 0; frame < maxFrames; frame++) {
             const brickChanges = [];
 
-            // Bricks no longer descend
-
             if (frame > minFrames * 0.25) {
                 speed = baseSpeed * 1.5;
             }
@@ -142,7 +144,15 @@ export function simulate(grids, options = {}) {
                         if (!piercingMode) {
                             const overlapX = ballDx > 0 ? (ballX + ballR) - brick.x : (brick.x + brick.w) - (ballX - ballR);
                             const overlapY = ballDy > 0 ? (ballY + ballR) - brick.y : (brick.y + brick.h) - (ballY - ballR);
-                            if (overlapX < overlapY) ballDx *= -1; else ballDy *= -1;
+                            
+                            // Fix: Push out vertically/horizontally to prevent getting trapped
+                            if (overlapX < overlapY) {
+                                ballDx *= -1;
+                                ballX += (ballDx > 0 ? 1 : -1) * (overlapX + 0.1); 
+                            } else {
+                                ballDy *= -1;
+                                ballY += (ballDy > 0 ? 1 : -1) * (overlapY + 0.1);
+                            }
                         }
 
                         const damage = piercingMode ? brick.hp : 1;
@@ -161,7 +171,7 @@ export function simulate(grids, options = {}) {
 
             frames.push({
                 activeLevel: seqIndex,
-                gridIndex, // 0 to max 4
+                gridIndex, 
                 ballX: Math.round(ballX * 10) / 10,
                 ballY: Math.round(ballY * 10) / 10,
                 paddleX: Math.round(paddleX * 10) / 10,
