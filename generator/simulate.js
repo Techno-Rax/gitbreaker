@@ -1,6 +1,6 @@
 export function simulate(grids, options = {}) {
     let {
-        height = 170,
+        height = 180, // Increased height for more paddle distance
         framesPerLevel = 1200,
         fps = 30,
     } = options;
@@ -9,14 +9,13 @@ export function simulate(grids, options = {}) {
     const cols = grids[0]?.[0]?.length || 52;
     const rows = 7;
 
-    // 1. Force exact GitHub dimensions
-    const brickW = 10;
-    const brickGap = 3;
-    const topPaddingBase = 25; 
-    const ballR = 5;
+    // 1. Smaller Grid & Components
+    const brickW = 8;
+    const brickGap = 2;
+    const topPaddingBase = 15; 
+    const ballR = 4;
 
-    // 2. Calculate the EXACT width required (Map + side padding for the ball)
-    const sidePadding = 24; // Ample room for the ball to slip past
+    const sidePadding = 20; 
     const gridWidth = cols * brickW + (cols - 1) * brickGap;
     const width = gridWidth + (sidePadding * 2);
     const startX = sidePadding;
@@ -27,13 +26,14 @@ export function simulate(grids, options = {}) {
     if (levelSequence.length === 0) levelSequence.push(0);
 
     const frames = [];
+    const finalBricks = []; // TRACK ALL BRICKS FOR THE RENDERER
     let totalScore = 0;
 
     let ballX = width / 2;
     let ballY = height - 50;
-    let paddleW = 80;
-    const paddleH = 10;
-    const paddleY = height - 25;
+    let paddleW = 50; // Smaller paddle
+    const paddleH = 6;
+    const paddleY = height - 15; // Push paddle to the bottom
     let paddleX = ballX - paddleW / 2;
 
     for (let seqIndex = 0; seqIndex < levelSequence.length; seqIndex++) {
@@ -67,13 +67,11 @@ export function simulate(grids, options = {}) {
         let ballDy = Math.sin(angle) * speed;
 
         const minFrames = Math.max(framesPerLevel, Math.ceil(totalBricks * 5));
-        const maxFrames = minFrames + 600; // Allow enough time without piercing mode
+        const maxFrames = minFrames + 600; 
 
         for (let frame = 0; frame < maxFrames; frame++) {
-            const brickChanges = [];
-            let frameBounced = false; // TRACK FOR PERFECT SVG SMOOTHNESS
+            let frameBounced = false; 
 
-            // Speed ramps up natively to clear the board, NO PIERCING MODE allowed!
             if (frame > minFrames * 0.4) speed = baseSpeed * 1.5;
             if (frame > minFrames * 0.6) speed = baseSpeed * 2.5;
             if (frame > minFrames * 0.8) speed = baseSpeed * 4.0;
@@ -129,24 +127,22 @@ export function simulate(grids, options = {}) {
 
                         if (brick.hp <= 0) {
                             brick.alive = false;
+                            brick.deathFrame = frames.length; // Record the exact frame it died
                             bricksDestroyed++;
                         }
-                        brickChanges.push({ id: brick.id, hp: brick.hp });
-                        break; // Important: only hit one brick per sub-step
+                        break; 
                     }
                 }
             }
 
             frames.push({
-                frameIndex: frame,       // Exact frame time
-                isBallBounce: frameBounced, // Flag to create a CSS keyframe
+                frameIndex: frames.length,
+                isBallBounce: frameBounced, 
                 activeLevel: seqIndex,
-                gridIndex, 
                 ballX: Math.round(ballX * 10) / 10,
                 ballY: Math.round(ballY * 10) / 10,
                 paddleX: Math.round(paddleX * 10) / 10,
-                paddleW, score: totalScore, brickChanges,
-                topPaddingOffset: topPadding - topPaddingBase
+                paddleW
             });
 
             if (bricksDestroyed >= totalBricks) {
@@ -154,10 +150,12 @@ export function simulate(grids, options = {}) {
                 if (frame >= minFrames) break;
             }
         }
+        
+        finalBricks.push(...bricks);
     }
 
     return {
-        frames, levelSequence, finalScore: totalScore,
-        brickLayout: { width, rows, cols, brickW, brickH: brickW, brickGap, topPaddingBase, startX },
+        frames, finalBricks, levelSequence, finalScore: totalScore,
+        brickLayout: { width, height, rows, cols, brickW, brickH: brickW, brickGap, topPaddingBase, startX },
     };
 }

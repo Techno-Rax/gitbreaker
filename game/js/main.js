@@ -56,7 +56,7 @@ class Game {
 
         // --- Anti-Gravity ---
         this.gravityDir = 1; // 1 = normal (paddle bottom), -1 = inverted (paddle top)
-        this.baseGravity = 50; // Subtle gravity pull
+        this.baseGravity = 0; // Subtle gravity pull
         this.gravityLocked = false; // Prevent spam
 
         // --- Slow-mo on last life ---

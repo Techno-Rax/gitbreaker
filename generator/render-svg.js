@@ -7,44 +7,34 @@ const THEMES = {
         text: '#c9d1d9',
         accent: '#58a6ff',
         paddle: '#58a6ff',
-        ball: '#3fb950',
+        ball: '#ff2a5f', // Neon Red/Pink
         palette: { 1: '#0e4429', 2: '#006d32', 3: '#26a641', 4: '#39d353' }
     }
 };
 
 export function renderSVG(simResult, width, height, grids, options = {}) {
-    const { fps = 30, username = '', theme = 'github-dark' } = options;
-    const { frames, levelSequence, brickLayout } = simResult;
-    const { rows, cols, brickW, brickH, brickGap, startX } = brickLayout;
+    const { fps = 30, theme = 'github-dark' } = options;
+    const { frames, finalBricks, brickLayout } = simResult;
+    const { brickW, brickH } = brickLayout;
 
     const t = THEMES[theme];
     const duration = frames.length / fps;
+    const totalFrames = frames.length - 1;
 
-    const ballR = 5;
-    const paddleH = 10;
-    const paddleY = height - 25;
+    const ballR = 4;
+    const paddleH = 6;
+    const paddleY = height - 15;
 
-    // 🧠 Detect bounce frames (inflection points)
     const ballKeyframes = [];
-
     for (let i = 0; i < frames.length; i++) {
         if (i === 0 || i === frames.length - 1) {
-            ballKeyframes.push({ ...frames[i], frameIndex: i });
+            ballKeyframes.push(frames[i]);
             continue;
         }
-
-        const prev = frames[i - 1];
-        const curr = frames[i];
-        const next = frames[i + 1];
-
-        const dx1 = curr.ballX - prev.ballX;
-        const dy1 = curr.ballY - prev.ballY;
-        const dx2 = next.ballX - curr.ballX;
-        const dy2 = next.ballY - curr.ballY;
-
-        // detect direction change
-        if (Math.sign(dx1) !== Math.sign(dx2) || Math.sign(dy1) !== Math.sign(dy2)) {
-            ballKeyframes.push({ ...curr, frameIndex: i });
+        const prev = frames[i - 1], curr = frames[i], next = frames[i + 1];
+        if (Math.sign(curr.ballX - prev.ballX) !== Math.sign(next.ballX - curr.ballX) || 
+            Math.sign(curr.ballY - prev.ballY) !== Math.sign(next.ballY - curr.ballY)) {
+            ballKeyframes.push(curr);
         }
     }
 
@@ -52,57 +42,50 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
     svg += `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">\n`;
     svg += `<style>\n`;
 
-    // Ball animation (inflection-based)
+    // Ball Animation
     svg += `@keyframes ballMove {\n`;
     for (const f of ballKeyframes) {
-        const pct = ((f.frameIndex / (frames.length - 1)) * 100).toFixed(2);
-        svg += `${pct}% { cx:${f.ballX.toFixed(1)}px; cy:${f.ballY.toFixed(1)}px; }\n`;
+        const pct = ((f.frameIndex / totalFrames) * 100).toFixed(2);
+        svg += `  ${pct}% { cx:${f.ballX.toFixed(1)}px; cy:${f.ballY.toFixed(1)}px; }\n`;
     }
     svg += `}\n`;
 
-    // Paddle animation (sampled)
+    // Paddle Animation
     const paddleStep = Math.max(1, Math.floor(frames.length / 100));
     svg += `@keyframes paddleMove {\n`;
     for (let i = 0; i < frames.length; i += paddleStep) {
-        const pct = ((i / (frames.length - 1)) * 100).toFixed(2);
-        svg += `${pct}% { x:${frames[i].paddleX.toFixed(1)}px; }\n`;
+        const pct = ((i / totalFrames) * 100).toFixed(2);
+        svg += `  ${pct}% { x:${frames[i].paddleX.toFixed(1)}px; }\n`;
     }
-    const lf = frames[frames.length - 1];
-    svg += `100% { x:${lf.paddleX.toFixed(1)}px; }\n`;
+    svg += `  100% { x:${frames[frames.length - 1].paddleX.toFixed(1)}px; }\n`;
     svg += `}\n`;
 
     svg += `.ball { animation: ballMove ${duration}s linear infinite; }\n`;
     svg += `.paddle { animation: paddleMove ${duration}s linear infinite; }\n`;
 
-    svg += `</style>\n`;
-
-    // Background
-    svg += `<rect width="100%" height="100%" fill="${t.bg}"/>\n`;
-
-    // Bricks
-    for (let seqIndex = 0; seqIndex < levelSequence.length; seqIndex++) {
-        const grid = grids[levelSequence[seqIndex]];
-        if (!grid) continue;
-
-        for (let r = 0; r < rows; r++) {
-            for (let c = 0; c < cols; c++) {
-                const hp = grid[r][c];
-                if (hp <= 0) continue;
-
-                const x = startX + c * (brickW + brickGap);
-                const y = 20 + r * (brickH + brickGap);
-
-                const color = t.palette[Math.min(hp, 4)];
-
-                svg += `<rect x="${x}" y="${y}" width="${brickW}" height="${brickH}" rx="2" fill="${color}"/>\n`;
-            }
+    // Disappearing Brick Animations
+    for (const brick of finalBricks) {
+        if (brick.deathFrame !== undefined) {
+            const animName = `b_${brick.id.replace(/-/g, '_')}`;
+            const pct = ((brick.deathFrame / totalFrames) * 100).toFixed(2);
+            // Opacity drops instantly immediately after the collision frame
+            svg += `@keyframes ${animName} { 0%, ${pct}% { opacity: 1; } ${Math.min(100, parseFloat(pct) + 0.1)}%, 100% { opacity: 0; } }\n`;
+            svg += `.brick-${brick.id} { animation: ${animName} ${duration}s linear infinite; }\n`;
         }
     }
 
-    // Paddle
-    svg += `<rect class="paddle" x="${frames[0].paddleX}" y="${paddleY}" width="${frames[0].paddleW}" height="${paddleH}" rx="5" fill="${t.paddle}"/>\n`;
+    svg += `</style>\n`;
+    svg += `<rect width="100%" height="100%" fill="${t.bg}"/>\n`;
 
-    // Ball
+    // Render Bricks
+    for (const brick of finalBricks) {
+        const color = t.palette[Math.min(brick.maxHp, 4)];
+        const cls = brick.deathFrame !== undefined ? `brick-${brick.id}` : '';
+        svg += `<rect class="${cls}" x="${brick.x}" y="${brick.y}" width="${brickW}" height="${brickH}" rx="2" fill="${color}"/>\n`;
+    }
+
+    // Render Paddle & Ball
+    svg += `<rect class="paddle" x="${frames[0].paddleX}" y="${paddleY}" width="${frames[0].paddleW}" height="${paddleH}" rx="3" fill="${t.paddle}"/>\n`;
     svg += `<circle class="ball" cx="${frames[0].ballX}" cy="${frames[0].ballY}" r="${ballR}" fill="${t.ball}"/>\n`;
 
     svg += `</svg>`;
