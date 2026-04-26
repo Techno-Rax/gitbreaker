@@ -1,33 +1,34 @@
 export function simulate(grids, options = {}) {
     let {
-        width = 800,
-        height = 340,
-        framesPerLevel = 200,
+        height = 170,
+        framesPerLevel = 1200,
         fps = 30,
-        sidePadding = 0,
     } = options;
 
     const dt = 1 / fps;
-    
-    // Fix: Reduced base width and increased top padding for better ball clearance
-    let brickW = 10; 
-    let brickGap = width < 760 ? 1 : 2;
-    const gridPadding = 16;
-    const topPaddingBase = 35; 
+    const cols = grids[0]?.[0]?.length || 52;
+    const rows = 7;
 
-    // Ping-pong index sequence: 0, 1, 2, 3, 4, 3, 2, 1
-    // (Assuming max 5 levels, if less, adjust)
+    // 1. Force exact GitHub dimensions
+    const brickW = 10;
+    const brickGap = 3;
+    const topPaddingBase = 25; 
+    const ballR = 5;
+
+    // 2. Calculate the EXACT width required (Map + side padding for the ball)
+    const sidePadding = 24; // Ample room for the ball to slip past
+    const gridWidth = cols * brickW + (cols - 1) * brickGap;
+    const width = gridWidth + (sidePadding * 2);
+    const startX = sidePadding;
+
     const levelSequence = [];
     for (let i = 0; i < grids.length; i++) levelSequence.push(i);
     for (let i = grids.length - 2; i > 0; i--) levelSequence.push(i);
     if (levelSequence.length === 0) levelSequence.push(0);
 
-    const totalFrames = levelSequence.length * framesPerLevel;
     const frames = [];
-    const allBrickEvents = [];
-    // We'll track events per level. allBrickEvents[lvlIndex] = [{row, col, hp}]
+    let totalScore = 0;
 
-    let ballR = 5;
     let ballX = width / 2;
     let ballY = height - 50;
     let paddleW = 80;
@@ -35,47 +36,22 @@ export function simulate(grids, options = {}) {
     const paddleY = height - 25;
     let paddleX = ballX - paddleW / 2;
 
-    let totalScore = 0;
-
-    // We also need to return layout info
-    const cols = grids[0]?.[0]?.length || 52;
-    const rows = 7;
-
-    // Fix: Force a minimum side gap so the ball (radius 5) can always pass
-    const minRequiredPadding = ballR * 4; 
-    const requestedSidePadding = Math.max(minRequiredPadding, Math.floor(sidePadding));
-    const availableWidth = Math.max(360, width - requestedSidePadding * 2);
-    
-    while (brickW > 5 && (brickW * cols + (cols - 1) * brickGap) > availableWidth) {
-        brickW -= 1;
-    }
-    if ((brickW * cols + (cols - 1) * brickGap) > availableWidth && brickGap > 1) {
-        brickGap = 1;
-    }
-
-    const brickH = brickW;
-    const totalWidth = cols * brickW + (cols - 1) * brickGap;
-    const maxSidePadding = Math.max(0, Math.floor((width - totalWidth) / 2));
-    const effectiveSidePadding = Math.min(requestedSidePadding, maxSidePadding);
-    const startX = effectiveSidePadding + Math.max(0, (width - effectiveSidePadding * 2 - totalWidth) / 2);
-
     for (let seqIndex = 0; seqIndex < levelSequence.length; seqIndex++) {
         const gridIndex = levelSequence[seqIndex];
         const grid = grids[gridIndex];
-
-        let topPadding = topPaddingBase;
         const bricks = [];
+        let topPadding = topPaddingBase;
+
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
                 const hp = grid[r][c] || 0;
                 if (hp > 0) {
                     bricks.push({
-                        id: `${seqIndex}-${r}-${c}`, // Unique per sequence so it can respawn
-                        gridIndex,
-                        row: r, col: c,
+                        id: `${seqIndex}-${r}-${c}`,
+                        gridIndex, row: r, col: c,
                         x: startX + c * (brickW + brickGap),
-                        y: topPadding + r * (brickH + brickGap),
-                        w: brickW, h: brickH,
+                        y: topPadding + r * (brickW + brickGap),
+                        w: brickW, h: brickW,
                         hp, maxHp: hp, alive: true,
                     });
                 }
@@ -90,18 +66,17 @@ export function simulate(grids, options = {}) {
         let ballDx = Math.cos(angle) * speed;
         let ballDy = Math.sin(angle) * speed;
 
-        // Guarantee enough simulation budget to reasonably clear dense levels.
         const minFrames = Math.max(framesPerLevel, Math.ceil(totalBricks * 5));
-        const maxFrames = Math.max(minFrames + 400, framesPerLevel * 2);
+        const maxFrames = minFrames + 600; // Allow enough time without piercing mode
 
-        // Simulate one level
         for (let frame = 0; frame < maxFrames; frame++) {
             const brickChanges = [];
+            let frameBounced = false; // TRACK FOR PERFECT SVG SMOOTHNESS
 
-            if (frame > minFrames * 0.25) {
-                speed = baseSpeed * 1.5;
-            }
-            const piercingMode = frame > (minFrames * 0.65) && bricksDestroyed < totalBricks;
+            // Speed ramps up natively to clear the board, NO PIERCING MODE allowed!
+            if (frame > minFrames * 0.4) speed = baseSpeed * 1.5;
+            if (frame > minFrames * 0.6) speed = baseSpeed * 2.5;
+            if (frame > minFrames * 0.8) speed = baseSpeed * 4.0;
 
             const steps = Math.ceil(speed * dt / (brickW * 0.8));
             const subDt = dt / steps;
@@ -111,103 +86,78 @@ export function simulate(grids, options = {}) {
                 ballY += ballDy * subDt;
 
                 const targetPaddleX = ballX - paddleW / 2;
-                // Add smooth + pseudo-random wander so the paddle feels less robotic.
-                const waveWander = Math.sin(frame * 0.22) * (paddleW * 0.5) + Math.cos(frame * 0.08) * (paddleW * 0.25);
-                const jitter = (Math.sin((frame + 1) * (s + 3) * 0.37) + Math.cos((frame + 11) * 0.19)) * (paddleW * 0.12);
-                const wander = waveWander + jitter;
-
-                // Snap closer if ball is dangerously close
-                const danger = Math.max(0, 1 - (paddleY - ballY) / 45);
-
-                paddleX += (targetPaddleX + wander * (1 - danger * 0.9) - paddleX) * 0.22;
+                const waveWander = Math.sin(frame * 0.22) * (paddleW * 0.5);
+                paddleX += (targetPaddleX + waveWander - paddleX) * 0.22;
                 paddleX = Math.max(0, Math.min(width - paddleW, paddleX));
 
-                if (ballX - ballR <= 0) { ballX = ballR; ballDx = Math.abs(ballDx); }
-                if (ballX + ballR >= width) { ballX = width - ballR; ballDx = -Math.abs(ballDx); }
-                if (ballY - ballR <= 0) { ballY = ballR; ballDy = Math.abs(ballDy); }
+                // Walls
+                if (ballX - ballR <= 0) { ballX = ballR; ballDx = Math.abs(ballDx); frameBounced = true; }
+                if (ballX + ballR >= width) { ballX = width - ballR; ballDx = -Math.abs(ballDx); frameBounced = true; }
+                if (ballY - ballR <= 0) { ballY = ballR; ballDy = Math.abs(ballDy); frameBounced = true; }
 
+                // Paddle
                 if (ballY + ballR >= paddleY) {
                     ballY = paddleY - ballR - 1;
                     const hitPos = (ballX - paddleX) / paddleW;
-                    const reflectAngle = -Math.PI / 2 + (hitPos - 0.5) * 2 * (Math.PI / 3) + (Math.random() - 0.5) * 0.2;
+                    const reflectAngle = -Math.PI / 2 + (hitPos - 0.5) * 2 * (Math.PI / 3);
                     ballDx = Math.cos(reflectAngle) * speed;
                     ballDy = -Math.abs(Math.sin(reflectAngle) * speed);
+                    frameBounced = true;
                 }
 
+                // Bricks
                 for (const brick of bricks) {
                     if (!brick.alive) continue;
-
                     if (
                         ballX + ballR > brick.x && ballX - ballR < brick.x + brick.w &&
                         ballY + ballR > brick.y && ballY - ballR < brick.y + brick.h
                     ) {
-                        if (!piercingMode) {
-                            const overlapX = ballDx > 0 ? (ballX + ballR) - brick.x : (brick.x + brick.w) - (ballX - ballR);
-                            const overlapY = ballDy > 0 ? (ballY + ballR) - brick.y : (brick.y + brick.h) - (ballY - ballR);
-                            
-                            // Fix: Push out vertically/horizontally to prevent getting trapped
-                            if (overlapX < overlapY) {
-                                ballDx *= -1;
-                                ballX += (ballDx > 0 ? 1 : -1) * (overlapX + 0.1); 
-                            } else {
-                                ballDy *= -1;
-                                ballY += (ballDy > 0 ? 1 : -1) * (overlapY + 0.1);
-                            }
+                        const overlapX = ballDx > 0 ? (ballX + ballR) - brick.x : (brick.x + brick.w) - (ballX - ballR);
+                        const overlapY = ballDy > 0 ? (ballY + ballR) - brick.y : (brick.y + brick.h) - (ballY - ballR);
+                        
+                        if (overlapX < overlapY) {
+                            ballDx *= -1;
+                            ballX += (ballDx > 0 ? 1 : -1) * (overlapX + 0.1); 
+                        } else {
+                            ballDy *= -1;
+                            ballY += (ballDy > 0 ? 1 : -1) * (overlapY + 0.1);
                         }
 
-                        const damage = piercingMode ? brick.hp : 1;
-                        brick.hp -= damage;
-                        totalScore += 10 * damage;
+                        brick.hp -= 1;
+                        totalScore += 10;
+                        frameBounced = true;
 
                         if (brick.hp <= 0) {
                             brick.alive = false;
                             bricksDestroyed++;
                         }
                         brickChanges.push({ id: brick.id, hp: brick.hp });
-                        if (!piercingMode) break;
+                        break; // Important: only hit one brick per sub-step
                     }
                 }
             }
 
             frames.push({
+                frameIndex: frame,       // Exact frame time
+                isBallBounce: frameBounced, // Flag to create a CSS keyframe
                 activeLevel: seqIndex,
                 gridIndex, 
                 ballX: Math.round(ballX * 10) / 10,
                 ballY: Math.round(ballY * 10) / 10,
                 paddleX: Math.round(paddleX * 10) / 10,
-                paddleW,
-                score: totalScore,
-                brickChanges,
-                levelProgress: Math.min(1, frame / minFrames),
+                paddleW, score: totalScore, brickChanges,
                 topPaddingOffset: topPadding - topPaddingBase
             });
 
-            if (bricksDestroyed >= totalBricks && frame >= minFrames) {
-                break;
-            }
-
             if (bricksDestroyed >= totalBricks) {
-                ballDx *= 0.95;
-                ballDy *= 0.95;
-                speed = Math.max(200, speed * 0.95);
+                ballDx *= 0.95; ballDy *= 0.95; speed *= 0.95;
+                if (frame >= minFrames) break;
             }
         }
     }
 
     return {
-        frames,
-        levelSequence,
-        finalScore: totalScore,
-        brickLayout: {
-            rows,
-            cols,
-            brickW,
-            brickH,
-            brickGap,
-            gridPadding,
-            topPaddingBase,
-            startX,
-            sidePadding: effectiveSidePadding,
-        },
+        frames, levelSequence, finalScore: totalScore,
+        brickLayout: { width, rows, cols, brickW, brickH: brickW, brickGap, topPaddingBase, startX },
     };
 }

@@ -44,13 +44,14 @@ export default async function handler(req, res) {
         }
 
         const simResult = simulate(grids, {
-            width: dimensions.width,
-            height: dimensions.height,
-            sidePadding: dimensions.sidePadding,
+            height: dimensions.height, // Only pass height, simulation determines width now
             framesPerLevel: 1200
         });
 
-        const svgString = renderSVG(simResult, dimensions.width, dimensions.height, grids, {
+        // Use the dynamically calculated width from the simulation
+        const finalWidth = simResult.brickLayout.width;
+
+        const svgString = renderSVG(simResult, finalWidth, dimensions.height, grids, {
             username,
             theme,
             compact: dimensions.compact,
