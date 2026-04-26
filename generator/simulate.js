@@ -1,6 +1,6 @@
 export function simulate(grids, options = {}) {
     let {
-        height = 180, // Increased height for more paddle distance
+        height = 200, // Increased height for even more breathing room
         framesPerLevel = 1200,
         fps = 30,
     } = options;
@@ -9,13 +9,13 @@ export function simulate(grids, options = {}) {
     const cols = grids[0]?.[0]?.length || 52;
     const rows = 7;
 
-    // 1. Smaller Grid & Components
-    const brickW = 8;
+    // 1. Sleeker, smaller dimensions
+    const brickW = 6;
     const brickGap = 2;
-    const topPaddingBase = 15; 
-    const ballR = 4;
+    const topPaddingBase = 20; 
+    const ballR = 2.5;
 
-    const sidePadding = 20; 
+    const sidePadding = 24; 
     const gridWidth = cols * brickW + (cols - 1) * brickGap;
     const width = gridWidth + (sidePadding * 2);
     const startX = sidePadding;
@@ -26,14 +26,14 @@ export function simulate(grids, options = {}) {
     if (levelSequence.length === 0) levelSequence.push(0);
 
     const frames = [];
-    const finalBricks = []; // TRACK ALL BRICKS FOR THE RENDERER
+    const finalBricks = []; 
     let totalScore = 0;
 
     let ballX = width / 2;
     let ballY = height - 50;
-    let paddleW = 50; // Smaller paddle
-    const paddleH = 6;
-    const paddleY = height - 15; // Push paddle to the bottom
+    let paddleW = 40; // Smaller, nimble paddle
+    const paddleH = 5;
+    const paddleY = height - 15; // Paddle pushed all the way down
     let paddleX = ballX - paddleW / 2;
 
     for (let seqIndex = 0; seqIndex < levelSequence.length; seqIndex++) {
@@ -71,6 +71,12 @@ export function simulate(grids, options = {}) {
 
         for (let frame = 0; frame < maxFrames; frame++) {
             let frameBounced = false; 
+            
+            // Damage scaling: Ensures heavy bricks DO break before the simulation ends
+            let damage = 1;
+            if (frame > minFrames * 0.3) damage = 2;
+            if (frame > minFrames * 0.5) damage = 4;
+            if (frame > minFrames * 0.7) damage = 100;
 
             if (frame > minFrames * 0.4) speed = baseSpeed * 1.5;
             if (frame > minFrames * 0.6) speed = baseSpeed * 2.5;
@@ -121,13 +127,13 @@ export function simulate(grids, options = {}) {
                             ballY += (ballDy > 0 ? 1 : -1) * (overlapY + 0.1);
                         }
 
-                        brick.hp -= 1;
+                        brick.hp -= damage;
                         totalScore += 10;
                         frameBounced = true;
 
                         if (brick.hp <= 0) {
                             brick.alive = false;
-                            brick.deathFrame = frames.length; // Record the exact frame it died
+                            brick.deathFrame = frames.length; // Record EXACT frame of death
                             bricksDestroyed++;
                         }
                         break; 
