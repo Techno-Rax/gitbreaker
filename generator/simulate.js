@@ -1,7 +1,7 @@
 export function simulate(grids, options = {}) {
     let {
-        height = 200, // Increased height for even more breathing room
-        framesPerLevel = 1200,
+        height = 140, 
+        framesPerLevel = 2500, // Increased to account for slow speed
         fps = 30,
     } = options;
 
@@ -9,31 +9,28 @@ export function simulate(grids, options = {}) {
     const cols = grids[0]?.[0]?.length || 52;
     const rows = 7;
 
-    // 1. Sleeker, smaller dimensions
-    const brickW = 6;
-    const brickGap = 2;
-    const topPaddingBase = 20; 
-    const ballR = 2.5;
+    const brickW = 5;
+    const brickGap = 1.5;
+    const topPaddingBase = 15; 
+    const ballR = 1.5;
 
-    const sidePadding = 24; 
+    const sidePadding = 20; 
     const gridWidth = cols * brickW + (cols - 1) * brickGap;
+    const gridHeight = rows * brickW + (rows - 1) * brickGap;
     const width = gridWidth + (sidePadding * 2);
     const startX = sidePadding;
 
-    const levelSequence = [];
-    for (let i = 0; i < grids.length; i++) levelSequence.push(i);
-    for (let i = grids.length - 2; i > 0; i--) levelSequence.push(i);
-    if (levelSequence.length === 0) levelSequence.push(0);
+    const levelSequence = [0];
 
     const frames = [];
     const finalBricks = []; 
     let totalScore = 0;
 
     let ballX = width / 2;
-    let ballY = height - 50;
-    let paddleW = 40; // Smaller, nimble paddle
-    const paddleH = 5;
-    const paddleY = height - 15; // Paddle pushed all the way down
+    let ballY = height - 40;
+    let paddleW = 30; 
+    const paddleH = 4;
+    const paddleY = height - 10; 
     let paddleX = ballX - paddleW / 2;
 
     for (let seqIndex = 0; seqIndex < levelSequence.length; seqIndex++) {
@@ -60,29 +57,29 @@ export function simulate(grids, options = {}) {
 
         const totalBricks = bricks.length;
         let bricksDestroyed = 0;
-        let baseSpeed = 430;
+        
+        // Drastically reduced speed
+        let baseSpeed = 50; 
         let speed = baseSpeed;
         let angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.4;
         let ballDx = Math.cos(angle) * speed;
         let ballDy = Math.sin(angle) * speed;
 
-        const minFrames = Math.max(framesPerLevel, Math.ceil(totalBricks * 5));
-        const maxFrames = minFrames + 600; 
+        const maxFrames = 6000; // Allows plenty of time for the slow ball to clear the board
 
         for (let frame = 0; frame < maxFrames; frame++) {
             let frameBounced = false; 
             
-            // Damage scaling: Ensures heavy bricks DO break before the simulation ends
+            // Escalating damage so heavy bricks eventually break
             let damage = 1;
-            if (frame > minFrames * 0.3) damage = 2;
-            if (frame > minFrames * 0.5) damage = 4;
-            if (frame > minFrames * 0.7) damage = 100;
+            if (frame > 2000) damage = 2;
+            if (frame > 3000) damage = 4;
+            if (frame > 4000) damage = 100;
 
-            if (frame > minFrames * 0.4) speed = baseSpeed * 1.5;
-            if (frame > minFrames * 0.6) speed = baseSpeed * 2.5;
-            if (frame > minFrames * 0.8) speed = baseSpeed * 4.0;
+            if (frame > 2500) speed = baseSpeed * 1.5;
+            if (frame > 4000) speed = baseSpeed * 2.5;
 
-            const steps = Math.ceil(speed * dt / (brickW * 0.8));
+            const steps = Math.ceil(speed * dt / (brickW * 0.5));
             const subDt = dt / steps;
 
             for (let s = 0; s < steps; s++) {
@@ -90,16 +87,14 @@ export function simulate(grids, options = {}) {
                 ballY += ballDy * subDt;
 
                 const targetPaddleX = ballX - paddleW / 2;
-                const waveWander = Math.sin(frame * 0.22) * (paddleW * 0.5);
-                paddleX += (targetPaddleX + waveWander - paddleX) * 0.22;
+                const waveWander = Math.sin(frame * 0.1) * (paddleW * 0.3);
+                paddleX += (targetPaddleX + waveWander - paddleX) * 0.15;
                 paddleX = Math.max(0, Math.min(width - paddleW, paddleX));
 
-                // Walls
                 if (ballX - ballR <= 0) { ballX = ballR; ballDx = Math.abs(ballDx); frameBounced = true; }
                 if (ballX + ballR >= width) { ballX = width - ballR; ballDx = -Math.abs(ballDx); frameBounced = true; }
                 if (ballY - ballR <= 0) { ballY = ballR; ballDy = Math.abs(ballDy); frameBounced = true; }
 
-                // Paddle
                 if (ballY + ballR >= paddleY) {
                     ballY = paddleY - ballR - 1;
                     const hitPos = (ballX - paddleX) / paddleW;
@@ -109,7 +104,6 @@ export function simulate(grids, options = {}) {
                     frameBounced = true;
                 }
 
-                // Bricks
                 for (const brick of bricks) {
                     if (!brick.alive) continue;
                     if (
@@ -133,7 +127,7 @@ export function simulate(grids, options = {}) {
 
                         if (brick.hp <= 0) {
                             brick.alive = false;
-                            brick.deathFrame = frames.length; // Record EXACT frame of death
+                            brick.deathFrame = frames.length; 
                             bricksDestroyed++;
                         }
                         break; 
@@ -144,7 +138,6 @@ export function simulate(grids, options = {}) {
             frames.push({
                 frameIndex: frames.length,
                 isBallBounce: frameBounced, 
-                activeLevel: seqIndex,
                 ballX: Math.round(ballX * 10) / 10,
                 ballY: Math.round(ballY * 10) / 10,
                 paddleX: Math.round(paddleX * 10) / 10,
@@ -152,8 +145,7 @@ export function simulate(grids, options = {}) {
             });
 
             if (bricksDestroyed >= totalBricks) {
-                ballDx *= 0.95; ballDy *= 0.95; speed *= 0.95;
-                if (frame >= minFrames) break;
+                break;
             }
         }
         
@@ -162,6 +154,6 @@ export function simulate(grids, options = {}) {
 
     return {
         frames, finalBricks, levelSequence, finalScore: totalScore,
-        brickLayout: { width, height, rows, cols, brickW, brickH: brickW, brickGap, topPaddingBase, startX },
+        brickLayout: { width, height, rows, cols, brickW, brickH: brickW, brickGap, topPaddingBase, startX, gridWidth, gridHeight },
     };
 }
