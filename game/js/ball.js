@@ -13,7 +13,7 @@ export class Ball {
         this.x = x;
         this.y = y;
         this.radius = radius;
-        this.baseSpeed = 280;
+        this.baseSpeed = 240;
         this.speed = this.baseSpeed;
         this.dx = 0;
         this.dy = 0;

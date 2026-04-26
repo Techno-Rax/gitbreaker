@@ -2,7 +2,7 @@
 
 # 🎮 GitBreaker
 
-[![CommitBreaker](https://gitbreaker.vercel.app/api/svg?user=anoojshete&theme=github-dark&size=half)](https://techno-rax.github.io/gitbreaker/)
+[![CommitBreaker](https://gitbreaker.vercel.app/api/svg?user=anoojshete&theme=github-dark)](https://gitbreaker.vercel.app)
 
 **Turn GitHub contributions into a playable arcade game.**
 
@@ -128,39 +128,24 @@ Routing is handled via `vercel.json`.
 
 ---
 
-## 🖼️ SVG Embed Sizing
-
-The SVG endpoint now supports size presets and custom dimensions.
+## 🖼️ SVG Embed
 
 Endpoint:
 
 ```text
-/api/svg?user=<username>&theme=<theme>&size=<preset>
-```
-
-### Presets
-
-* `size=full` → full-width profile style (`1200x190`)
-* `size=half` → balanced/default (`800x170`)
-* `size=compact` → smaller footprint (`680x160`)
-
-### Custom Size
-
-```text
-/api/svg?user=techno-rax&theme=github-dark&width=960&height=170
+/api/svg?user=<username>&theme=<theme>
 ```
 
 ### Optional Rendering Controls
 
-* `sidePadding=<0..100>` adds horizontal gutter in simulation
 * `watermarkOpacity=<0.04..0.35>` adjusts year watermark visibility
 
 Examples:
 
 ```markdown
-[![CommitBreaker](https://gitbreaker.vercel.app/api/svg?user=techno-rax&theme=github-dark&size=full)](https://techno-rax.github.io/gitbreaker/)
-[![CommitBreaker](https://gitbreaker.vercel.app/api/svg?user=techno-rax&theme=dracula&size=half)](https://techno-rax.github.io/gitbreaker/)
-[![CommitBreaker](https://gitbreaker.vercel.app/api/svg?user=techno-rax&theme=github-light&width=960&height=170&watermarkOpacity=0.16)](https://techno-rax.github.io/gitbreaker/)
+[![CommitBreaker](https://gitbreaker.vercel.app/api/svg?user=techno-rax&theme=github-dark)](https://gitbreaker.vercel.app)
+[![CommitBreaker](https://gitbreaker.vercel.app/api/svg?user=techno-rax&theme=dracula)](https://gitbreaker.vercel.app)
+[![CommitBreaker](https://gitbreaker.vercel.app/api/svg?user=techno-rax&theme=github-light&watermarkOpacity=0.16)](https://gitbreaker.vercel.app)
 ```
 
 ---

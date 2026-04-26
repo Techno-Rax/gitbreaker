@@ -69,7 +69,7 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
     const yearFontSize = Math.max(34, Math.min(92, Math.round(Math.min(width * 0.1, height * 0.55))));
 
     // Track brick hits by absolute ID for destruction animations
-    const brickEvents = new Map(); 
+    const brickEvents = new Map();
     for (let i = 0; i < frames.length; i++) {
         for (const change of frames[i].brickChanges) {
             const key = change.id;
@@ -93,7 +93,7 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
     svg += `    @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }\n`;
 
     // Drop precision for speed
-    const step = Math.max(1, Math.floor(frames.length / 150)); 
+    const step = Math.max(1, Math.floor(frames.length / 150));
     svg += `    @keyframes ballMove {\n`;
     for (let i = 0; i < frames.length; i += step) {
         const pct = ((i / (frames.length - 1)) * 100).toFixed(1);
@@ -116,7 +116,7 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
         const r = seqRanges[seqIndex];
         const s = ((r.startFrame / frames.length) * 100).toFixed(1);
         const e = ((r.endFrame / frames.length) * 100).toFixed(1);
-        
+
         svg += `    @keyframes fadeLvl_${seqIndex} {\n`;
         // Hard cut-in, fade-out slightly on end
         const beforeS = Math.max(0, s - 0.1).toFixed(1);
@@ -136,11 +136,11 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
         if (deathEvent) {
             const dp = ((deathEvent.frame / frames.length) * 100).toFixed(1);
             const pd = Math.max(0, parseFloat(dp) - 0.5).toFixed(1);
-            svg += `    @keyframes b_${key.replace(/-/g,'_')} {\n`;
+            svg += `    @keyframes b_${key.replace(/-/g, '_')} {\n`;
             svg += `      0%, ${pd}% { opacity: 1; transform: scale(1); }\n`;
             svg += `      ${dp}%, 100% { opacity: 0; transform: scale(0.6); }\n`;
             svg += `    }\n`;
-            svg += `    .b-${key.replace(/-/g,'_')} { animation: b_${key.replace(/-/g,'_')} ${totalDuration}s linear infinite; transform-origin: center; transform-box: fill-box; }\n`;
+            svg += `    .b-${key.replace(/-/g, '_')} { animation: b_${key.replace(/-/g, '_')} ${totalDuration}s linear infinite; transform-origin: center; transform-box: fill-box; }\n`;
         }
     }
 
@@ -162,14 +162,14 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
         if (!grid) continue;
 
         svg += `  <g class="lvl-${seqIndex}" opacity="0">\n`;
-        
+
         // Render year text in the background of the active layer
         // Assumes current year is grids[0] and decrements, although grids is array of years data.
         // Wait, actually fetchContributions now returns an array of years.
         // We didn't pass the actual 'year' strings to renderSVG. Let's just calculate it: Since max is 5, it's roughly currentYear - gridIndex.
         const currentY = new Date().getFullYear();
         const yearText = currentY - gridIndex;
-        svg += `    <text x="${width/2}" y="${height/2}" dominant-baseline="middle" font-family="sans-serif" font-size="${yearFontSize}" font-weight="800" text-anchor="middle" fill="${watermarkFill}" style="pointer-events: none;">${yearText}</text>\n`;
+        svg += `    <text x="${width / 2}" y="${height / 2}" dominant-baseline="middle" font-family="sans-serif" font-size="${yearFontSize}" font-weight="800" text-anchor="middle" fill="${watermarkFill}" style="pointer-events: none;">${yearText}</text>\n`;
 
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
@@ -179,16 +179,16 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
                 const y = tPad + r * (brickH + brickGap);
                 const color = t.palette[Math.min(hp, 4)] || t.palette[1];
                 const key = `${seqIndex}-${r}-${c}`;
-                const cName = brickEvents.has(key) ? `b-${key.replace(/-/g,'_')}` : '';
+                const cName = brickEvents.has(key) ? `b-${key.replace(/-/g, '_')}` : '';
                 svg += `    <rect class="${cName}" x="${x}" y="${y}" width="${brickW}" height="${brickH}" fill="${color}" rx="2"/>\n`;
             }
         }
         svg += `  </g>\n`;
     }
 
-    svg += `  <rect class="paddle" x="${frames[0].paddleX}" y="${paddleY}" width="${frames[0].paddleW}" height="${paddleH}" fill="${t.paddle}" rx="${paddleH/2}"/>\n`;
+    svg += `  <rect class="paddle" x="${frames[0].paddleX}" y="${paddleY}" width="${frames[0].paddleW}" height="${paddleH}" fill="${t.paddle}" rx="${paddleH / 2}"/>\n`;
     svg += `  <circle class="ball" cx="${frames[0].ballX}" cy="${frames[0].ballY}" r="${ballR}" fill="${t.ball}"/>\n`;
-    
+
     svg += `</svg>\n`;
     return svg;
 }

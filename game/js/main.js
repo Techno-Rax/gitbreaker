@@ -149,10 +149,11 @@ class Game {
         // --- Export Feature ---
         const updateExportCode = () => {
             const theme = document.getElementById('export-theme').value;
-            const domain = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-                ? 'https://gitbreaker.vercel.app' 
+            const domain = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? 'https://gitbreaker.vercel.app'
                 : window.location.origin;
-            const user = this.username && this.username !== 'demo' ? this.username : 'techno-rax';
+            const typedUser = UI.getUsername();
+            const user = typedUser || (this.username && this.username !== 'demo' ? this.username : 'techno-rax');
 
             let query = `user=${encodeURIComponent(user)}&theme=${encodeURIComponent(theme)}`;
 
@@ -184,7 +185,7 @@ class Game {
 
         document.getElementById('restart-btn')?.addEventListener('click', () => this._restartGame());
         document.getElementById('win-restart-btn')?.addEventListener('click', () => this._restartGame());
-        
+
         const returnToHome = () => {
             this.state = State.MENU;
             UI.showScreen('start-screen');
@@ -349,7 +350,7 @@ class Game {
         UI.updateLives(this.lives);
         UI.updateUsername(this.username);
         UI.updateGravity(1);
-        
+
         // Start game loop safely
         this.state = State.PLAYING;
     }
@@ -390,9 +391,9 @@ class Game {
         // Bricks — with spatial grid
         const result = generateGrid(gridData, this.canvas.width, this.canvas.height, {
             isHpData,
-            topPadding: -200, // Slide in from top
+            topPadding: 40,
         });
-        
+
         this.bricks = result.bricks;
         this.spatialGrid = result.spatialGrid;
         this.gridInfo = result.gridInfo;
@@ -521,24 +522,26 @@ class Game {
         }
 
         // ── Grid Descending Logic (Soft Floor + Pressure Zone) ──
-        const dropSpeedBase = Math.min(25, 3 + this.bricksDestroyedCount * 0.1);
+        const dropSpeedBase = Math.min(14, 1.5 + this.bricksDestroyedCount * 0.05);
         let closestDist = 9999;
         let dangerCount = 0;
 
         for (const brick of this.bricks) {
             if (!brick.alive) continue;
-            const dist = this.gravityDir > 0 
+            const dist = this.gravityDir > 0
                 ? this.paddle.y - (brick.y + brick.height)
                 : brick.y - (this.paddle.y + this.paddle.height);
-                
+
             if (dist < closestDist) closestDist = dist;
             if (dist < 30) dangerCount++;
         }
 
         let actualSpeed = dropSpeedBase;
-        // Soft Floor: slow down when getting close to paddle
-        if (closestDist < 250) {
-            actualSpeed *= Math.max(0.0, (closestDist - 150) / 100);
+        // Soft floor: ease down near paddle but never freeze fully.
+        if (Number.isFinite(closestDist) && closestDist < 220) {
+            const normalized = Math.max(0, Math.min(1, closestDist / 220));
+            const floorFactor = 0.2 + normalized * 0.8;
+            actualSpeed *= floorFactor;
         }
 
         const dy = actualSpeed * this.gravityDir * dt;

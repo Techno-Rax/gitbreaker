@@ -22,7 +22,7 @@ export function simulate(grids, options = {}) {
 
     const totalFrames = levelSequence.length * framesPerLevel;
     const frames = [];
-    const allBrickEvents = []; 
+    const allBrickEvents = [];
     // We'll track events per level. allBrickEvents[lvlIndex] = [{row, col, hp}]
 
     let ballR = 5;
@@ -34,7 +34,7 @@ export function simulate(grids, options = {}) {
     let paddleX = ballX - paddleW / 2;
 
     let totalScore = 0;
-    
+
     // We also need to return layout info
     const cols = grids[0]?.[0]?.length || 52;
     const rows = 7;
@@ -58,7 +58,7 @@ export function simulate(grids, options = {}) {
     for (let seqIndex = 0; seqIndex < levelSequence.length; seqIndex++) {
         const gridIndex = levelSequence[seqIndex];
         const grid = grids[gridIndex];
-        
+
         let topPadding = topPaddingBase;
         const bricks = [];
         for (let r = 0; r < rows; r++) {
@@ -80,23 +80,27 @@ export function simulate(grids, options = {}) {
 
         const totalBricks = bricks.length;
         let bricksDestroyed = 0;
-        let baseSpeed = 500;
+        let baseSpeed = 430;
         let speed = baseSpeed;
         let angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.4;
         let ballDx = Math.cos(angle) * speed;
         let ballDy = Math.sin(angle) * speed;
 
+        // Guarantee enough simulation budget to reasonably clear dense levels.
+        const minFrames = Math.max(framesPerLevel, Math.ceil(totalBricks * 5));
+        const maxFrames = Math.max(minFrames + 400, framesPerLevel * 2);
+
         // Simulate one level
-        for (let frame = 0; frame < framesPerLevel; frame++) {
+        for (let frame = 0; frame < maxFrames; frame++) {
             const brickChanges = [];
 
             // Bricks no longer descend
 
-            if (frame > framesPerLevel * 0.3) {
-                speed = baseSpeed * 1.5; 
+            if (frame > minFrames * 0.25) {
+                speed = baseSpeed * 1.5;
             }
-            const piercingMode = frame > (framesPerLevel * 0.8) && bricksDestroyed < totalBricks;
-            
+            const piercingMode = frame > (minFrames * 0.65) && bricksDestroyed < totalBricks;
+
             const steps = Math.ceil(speed * dt / (brickW * 0.8));
             const subDt = dt / steps;
 
@@ -109,10 +113,10 @@ export function simulate(grids, options = {}) {
                 const waveWander = Math.sin(frame * 0.22) * (paddleW * 0.5) + Math.cos(frame * 0.08) * (paddleW * 0.25);
                 const jitter = (Math.sin((frame + 1) * (s + 3) * 0.37) + Math.cos((frame + 11) * 0.19)) * (paddleW * 0.12);
                 const wander = waveWander + jitter;
-                
+
                 // Snap closer if ball is dangerously close
                 const danger = Math.max(0, 1 - (paddleY - ballY) / 45);
-                
+
                 paddleX += (targetPaddleX + wander * (1 - danger * 0.9) - paddleX) * 0.22;
                 paddleX = Math.max(0, Math.min(width - paddleW, paddleX));
 
@@ -125,7 +129,7 @@ export function simulate(grids, options = {}) {
                     const hitPos = (ballX - paddleX) / paddleW;
                     const reflectAngle = -Math.PI / 2 + (hitPos - 0.5) * 2 * (Math.PI / 3) + (Math.random() - 0.5) * 0.2;
                     ballDx = Math.cos(reflectAngle) * speed;
-                    ballDy = -Math.abs(Math.sin(reflectAngle) * speed); 
+                    ballDy = -Math.abs(Math.sin(reflectAngle) * speed);
                 }
 
                 for (const brick of bricks) {
@@ -150,7 +154,7 @@ export function simulate(grids, options = {}) {
                             bricksDestroyed++;
                         }
                         brickChanges.push({ id: brick.id, hp: brick.hp });
-                        if (!piercingMode) break; 
+                        if (!piercingMode) break;
                     }
                 }
             }
@@ -164,9 +168,13 @@ export function simulate(grids, options = {}) {
                 paddleW,
                 score: totalScore,
                 brickChanges,
-                levelProgress: frame / framesPerLevel,
+                levelProgress: Math.min(1, frame / minFrames),
                 topPaddingOffset: topPadding - topPaddingBase
             });
+
+            if (bricksDestroyed >= totalBricks && frame >= minFrames) {
+                break;
+            }
 
             if (bricksDestroyed >= totalBricks) {
                 ballDx *= 0.95;

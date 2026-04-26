@@ -24,7 +24,7 @@ export async function fetchContributions(username, token = process.env.GITHUB_TO
     const now = new Date();
     const currentYear = now.getFullYear();
     const yearsToFetch = [];
-    
+
     // We will fetch this year and the previous 4 years (max 5)
     for (let i = 0; i < 5; i++) {
         const y = currentYear - i;
@@ -71,25 +71,25 @@ export async function fetchContributions(username, token = process.env.GITHUB_TO
             totalAllTime += calendar.totalContributions;
         } else if (i === 0 && calendar) {
             // Include current year even if 0 manually
-             yearsData.push({
+            yearsData.push({
                 year: y,
                 weeks: calendar.weeks,
                 totalContributions: calendar.totalContributions,
                 grid: weeksToGrid(calendar.weeks)
             });
         } else {
-             // Continue fetching older years even if one is empty
-             continue;
+            // Continue fetching older years even if one is empty
+            continue;
         }
     }
 
     // Default return structure for backward compatibility picks the first (current) year
     // but adds 'years' array for the new multi-timeline logic
     const current = yearsData[0] || { weeks: [], totalContributions: 0, grid: [] };
-    
-    return { 
-        weeks: current.weeks, 
-        totalContributions: current.totalContributions, 
+
+    return {
+        weeks: current.weeks,
+        totalContributions: current.totalContributions,
         grid: current.grid,
         years: yearsData,
         totalAllTime
@@ -125,7 +125,7 @@ function weeksToGrid(weeks) {
             if (dayData) {
                 grid[day].push(levelToHp(dayData.contributionLevel));
             } else {
-                 // Important: if no day data, we inject an empty space to maintain column alignment
+                // Important: if no day data, we inject an empty space to maintain column alignment
                 grid[day].push(0);
             }
         }
@@ -207,8 +207,8 @@ export function generateDemoGrid() {
 
     const totalAllTime = yearsData.reduce((sum, y) => sum + y.totalContributions, 0);
 
-    return { 
-        grid: yearsData[0].grid, 
+    return {
+        grid: yearsData[0].grid,
         totalContributions: yearsData[0].totalContributions,
         years: yearsData,
         totalAllTime,

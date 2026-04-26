@@ -2,6 +2,17 @@ import { fetchContributions, generateDemoGrid } from '../generator/fetch-contrib
 import { simulate } from '../generator/simulate.js';
 import { renderSVG } from '../generator/render-svg.js';
 
+function parseNumber(value, fallback) {
+    if (value === undefined || value === null || value === '') return fallback;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function clamp(value, min, max) {
+    if (!Number.isFinite(value)) return value;
+    return Math.min(max, Math.max(min, value));
+}
+
 function resolveDimensions(query) {
     const width = 720;
     const height = 170;
@@ -32,11 +43,11 @@ export default async function handler(req, res) {
             grids = data.years.map(y => y.grid);
         }
 
-        const simResult = simulate(grids, { 
+        const simResult = simulate(grids, {
             width: dimensions.width,
             height: dimensions.height,
             sidePadding: dimensions.sidePadding,
-            framesPerLevel: 800 
+            framesPerLevel: 1200
         });
 
         const svgString = renderSVG(simResult, dimensions.width, dimensions.height, grids, {
@@ -58,7 +69,7 @@ export default async function handler(req, res) {
             width: dimensions.width,
             height: dimensions.height,
             sidePadding: dimensions.sidePadding,
-            framesPerLevel: 800,
+            framesPerLevel: 1200,
         });
         const svgString = renderSVG(simResult, dimensions.width, dimensions.height, grids, {
             username: 'Error - Demo',
@@ -66,7 +77,7 @@ export default async function handler(req, res) {
             compact: dimensions.compact,
             watermarkOpacity: dimensions.watermarkOpacity,
         });
-        
+
         res.setHeader('Content-Type', 'image/svg+xml');
         res.setHeader('Cache-Control', 'public, s-maxage=60');
         return res.status(200).send(svgString);
