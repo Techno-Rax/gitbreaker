@@ -1,27 +1,39 @@
 const THEMES = {
     'github-dark': {
-        bg: '#080810', // Matched play mode background
-        lines: 'rgba(255,255,255,0.025)', // Matched play mode grid lines
-        paddle: '#00b8d4', // Play mode neon cyan
-        ball: '#ff2a5f',   // Play mode neon red/pink
+        bg: '#080810',
+        lines: 'rgba(255,255,255,0.025)',
+        paddle: '#00b8d4',
+        ball: '#ff2a5f', 
         palette: { 1: '#0e4429', 2: '#006d32', 3: '#26a641', 4: '#39d353' }
+    },
+    'github-light': {
+        bg: '#ffffff',
+        lines: 'rgba(0,0,0,0.03)',
+        paddle: '#0969da',
+        ball: '#ff2a5f',
+        palette: { 1: '#9be9a8', 2: '#40c463', 3: '#30a14e', 4: '#216e39' }
     }
 };
 
 export function renderSVG(simResult, width, height, grids, options = {}) {
-    const { fps = 30, theme = 'github-dark' } = options;
+    const { fps = 30, theme = 'github-dark', watermarkOpacity = 0.05 } = options;
     const { frames, finalBricks, brickLayout } = simResult;
     const { brickW, brickH } = brickLayout;
 
-    const t = THEMES[theme];
+    const t = THEMES[theme] || THEMES['github-dark'];
+    
+    // Dynamic watermark color based on theme
+    const watermarkColor = theme === 'github-light' 
+        ? `rgba(0,0,0,${watermarkOpacity + 0.02})` 
+        : `rgba(255,255,255,${watermarkOpacity})`;
+
     const duration = frames.length / fps;
     const totalFrames = frames.length - 1;
 
-    const ballR = 2.5; // Shrunk ball
-    const paddleH = 5; // Shrunk paddle
-    const paddleY = height - 15;
+    const ballR = 1.5; 
+    const paddleH = 4; 
+    const paddleY = height - 10;
 
-    // Filter to only inflection points to save massive amounts of file size
     const ballKeyframes = [];
     for (let i = 0; i < frames.length; i++) {
         if (i === 0 || i === frames.length - 1) {
@@ -39,8 +51,7 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
     svg += `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">\n`;
     svg += `<style>\n`;
 
-    // Trail Keyframe Generator
-    // This creates perfect trails that follow the ball's exact mathematical path but delayed
+    // ── Comet Trail Generator ──
     function createTrail(offsetFrames, opacity, className) {
         let kfs = `@keyframes ${className} {\n`;
         kfs += `  0% { cx:${frames[0].ballX.toFixed(1)}px; cy:${frames[0].ballY.toFixed(1)}px; opacity: 0; }\n`;
@@ -51,7 +62,7 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
 
         for (const f of ballKeyframes) {
             let shiftedFrame = f.frameIndex + offsetFrames;
-            if (shiftedFrame > totalFrames || shiftedFrame === 0) continue;
+            if (shiftedFrame > totalFrames) continue;
             const pct = ((shiftedFrame / totalFrames) * 100).toFixed(2);
             kfs += `  ${pct}% { cx:${f.ballX.toFixed(1)}px; cy:${f.ballY.toFixed(1)}px; }\n`;
         }
@@ -68,10 +79,14 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
     }
     svg += `}\n`;
 
-    // Trail components (Delayed by 2, 4, and 6 frames)
-    svg += createTrail(2, 0.6, 'trail1');
-    svg += createTrail(4, 0.3, 'trail2');
-    svg += createTrail(6, 0.1, 'trail3');
+    // Generate 6 packed trail segments to look like a solid comet line
+    const trailCount = 6;
+    for (let i = 1; i <= trailCount; i++) {
+        const offset = i * 2; 
+        const opacity = (1 - (i / (trailCount + 1))) * 0.8;
+        svg += createTrail(offset, opacity, `trail${i}`);
+        svg += `.t${i} { animation: trail${i} ${duration}s linear infinite; }\n`;
+    }
 
     // Paddle Animation
     const paddleStep = Math.max(1, Math.floor(frames.length / 100));
@@ -83,14 +98,10 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
     svg += `  100% { x:${frames[frames.length - 1].paddleX.toFixed(1)}px; }\n`;
     svg += `}\n`;
 
-    // Bind animations to classes
     svg += `.ball { animation: ballMove ${duration}s linear infinite; }\n`;
-    svg += `.t1 { animation: trail1 ${duration}s linear infinite; }\n`;
-    svg += `.t2 { animation: trail2 ${duration}s linear infinite; }\n`;
-    svg += `.t3 { animation: trail3 ${duration}s linear infinite; }\n`;
     svg += `.paddle { animation: paddleMove ${duration}s linear infinite; }\n`;
 
-    // Disappearing Brick Animations
+    // Exact Brick Disappearance
     for (const brick of finalBricks) {
         if (brick.deathFrame !== undefined) {
             const animName = `b_${brick.id.replace(/-/g, '_')}`;
@@ -102,16 +113,19 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
 
     svg += `</style>\n`;
     
-    // Background Definitions
+    // Dot Grid Pattern
     svg += `<defs>\n`;
     svg += `  <pattern id="dotGrid" width="24" height="24" patternUnits="userSpaceOnUse">\n`;
     svg += `    <rect x="0" y="0" width="1" height="1" fill="${t.lines}"/>\n`;
     svg += `  </pattern>\n`;
     svg += `</defs>\n`;
 
-    // Background Layers
     svg += `<rect width="100%" height="100%" fill="${t.bg}"/>\n`;
     svg += `<rect width="100%" height="100%" fill="url(#dotGrid)"/>\n`;
+
+    // ── Render Watermark ──
+    const currentYear = new Date().getFullYear(); // Using the current year for the single-year simulation
+    svg += `<text x="${width / 2}" y="${height / 2 + 10}" dominant-baseline="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="90" font-weight="900" text-anchor="middle" fill="${watermarkColor}" style="pointer-events: none; user-select: none;">${currentYear}</text>\n`;
 
     // Render Bricks
     for (const brick of finalBricks) {
@@ -121,13 +135,13 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
     }
 
     // Render Paddle
-    svg += `<rect class="paddle" x="${frames[0].paddleX}" y="${paddleY}" width="${frames[0].paddleW}" height="${paddleH}" rx="2.5" fill="${t.paddle}"/>\n`;
+    svg += `<rect class="paddle" x="${frames[0].paddleX}" y="${paddleY}" width="${frames[0].paddleW}" height="${paddleH}" rx="2" fill="${t.paddle}"/>\n`;
     
-    // Render Trail
-    const sr = ballR * 0.8; // Trails are slightly smaller
-    svg += `<circle class="t3" cx="${frames[0].ballX}" cy="${frames[0].ballY}" r="${sr}" fill="${t.ball}"/>\n`;
-    svg += `<circle class="t2" cx="${frames[0].ballX}" cy="${frames[0].ballY}" r="${sr}" fill="${t.ball}"/>\n`;
-    svg += `<circle class="t1" cx="${frames[0].ballX}" cy="${frames[0].ballY}" r="${sr}" fill="${t.ball}"/>\n`;
+    // Render Trail (back to front)
+    for (let i = trailCount; i >= 1; i--) {
+        const r = ballR * (1 - (i * 0.12)); // Trails narrow out into a tail
+        svg += `<circle class="t${i}" cx="${frames[0].ballX}" cy="${frames[0].ballY}" r="${r}" fill="${t.ball}"/>\n`;
+    }
     
     // Render Main Ball
     svg += `<circle class="ball" cx="${frames[0].ballX}" cy="${frames[0].ballY}" r="${ballR}" fill="${t.ball}"/>\n`;
