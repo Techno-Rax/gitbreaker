@@ -2,7 +2,7 @@
 
 # 🎮 GitBreaker
 
-<img src="https://raw.githubusercontent.com/techno-rax/gitbreaker/main/output/game.svg" alt="GitBreaker SVG Animation" />
+[![CommitBreaker](https://gitbreaker.vercel.app/api/svg?user=anoojshete&theme=github-dark&size=half)](https://techno-rax.github.io/gitbreaker/)
 
 **Turn GitHub contributions into a playable arcade game.**
 
