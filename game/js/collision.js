@@ -81,11 +81,29 @@ export function ballBricksSpatial(ball, gridInfo, spatialGrid) {
         const minY = Math.min(overlapTop, overlapBottom);
 
         if (minX < minY) {
-            ball.dx = -ball.dx;
-            ball.x += overlapLeft < overlapRight ? -minX : minX;
+            // Horizontal Collision
+            if (overlapLeft < overlapRight && ball.dx > 0) {
+                ball.dx = -Math.abs(ball.dx); // Force left
+                ball.x -= (minX + 0.1);       // Push out
+            } else if (overlapRight < overlapLeft && ball.dx < 0) {
+                ball.dx = Math.abs(ball.dx);  // Force right
+                ball.x += (minX + 0.1);
+            } else {
+                // Failsafe push-out if already moving away
+                ball.x += overlapLeft < overlapRight ? -(minX + 0.1) : (minX + 0.1);
+            }
         } else {
-            ball.dy = -ball.dy;
-            ball.y += overlapTop < overlapBottom ? -minY : minY;
+            // Vertical Collision
+            if (overlapTop < overlapBottom && ball.dy > 0) {
+                ball.dy = -Math.abs(ball.dy); // Force up
+                ball.y -= (minY + 0.1);
+            } else if (overlapBottom < overlapTop && ball.dy < 0) {
+                ball.dy = Math.abs(ball.dy);  // Force down
+                ball.y += (minY + 0.1);
+            } else {
+                // Failsafe push-out if already moving away
+                ball.y += overlapTop < overlapBottom ? -(minY + 0.1) : (minY + 0.1);
+            }
         }
 
         ball.hitFlash = 0.08;

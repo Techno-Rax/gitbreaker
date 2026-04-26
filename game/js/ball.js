@@ -13,32 +13,26 @@ export class Ball {
         this.x = x;
         this.y = y;
         this.radius = radius;
-        this.baseSpeed = 240;
+        this.baseSpeed = 300; // slightly increased base speed for better flow
         this.speed = this.baseSpeed;
         this.dx = 0;
         this.dy = 0;
         this.active = false;
 
-        // Trail (ring buffer for perf)
-        this.trail = new Float32Array(24); // 12 positions × (x, y)
+        this.trail = new Float32Array(24);
         this.trailHead = 0;
         this.trailLen = 0;
         this.maxTrail = 12;
 
-        // Anti-gravity
-        this.gravity = 0; // 0 = no gravity, positive = down, negative = up
-        this.orbitalCurve = 0; // Slight curve from gravity
+        this.gravity = 0; 
+        this.orbitalCurve = 0; 
 
-        // Visual
         this.hitFlash = 0;
-        this.color = '#00ff88';
+        this.color = '#ff2a5f'; // Changed to a vibrant pink/red to stand out
 
-        // Speed scaling
         this.bricksDestroyed = 0;
         this.speedMultiplier = 1;
-
-        // Slow-mo
-        this.slowMo = 1; // 1 = normal, < 1 = slow motion
+        this.slowMo = 1; 
     }
 
     /** Launch ball at an angle */
@@ -84,18 +78,21 @@ export class Ball {
         this.trailHead = (this.trailHead + 1) % this.maxTrail;
         if (this.trailLen < this.maxTrail) this.trailLen++;
 
-        // Apply gravity (orbital curve effect)
+        // Apply gravity
         if (this.gravity !== 0) {
             this.dy += this.gravity * gravityDir * sDt;
             this.dx += this.orbitalCurve * gravityDir * sDt;
         }
 
-        // Clamp speed
+        // STRICT SPEED ENFORCEMENT
         const effectiveSpeed = this.speed * this.speedMultiplier;
         const mag = Math.sqrt(this.dx * this.dx + this.dy * this.dy);
-        if (mag > effectiveSpeed * 1.5) {
-            this.dx = (this.dx / mag) * effectiveSpeed;
-            this.dy = (this.dy / mag) * effectiveSpeed;
+        
+        if (mag > 0.1) {
+            // If zero-G, strictly lock the speed. If gravity is active, allow slight acceleration but cap it.
+            const targetSpeed = this.gravity === 0 ? effectiveSpeed : Math.min(mag, effectiveSpeed * 1.25);
+            this.dx = (this.dx / mag) * targetSpeed;
+            this.dy = (this.dy / mag) * targetSpeed;
         }
 
         // Move
@@ -114,7 +111,7 @@ export class Ball {
             this.hitFlash = 0.1;
         }
 
-        // Top/bottom boundaries — depends on gravity
+        // Top/bottom boundaries
         if (gravityDir > 0) {
             if (this.y - this.radius <= 0) {
                 this.y = this.radius;
@@ -131,7 +128,6 @@ export class Ball {
             if (this.y + this.radius < 0) return 'lost';
         }
 
-        // Decay flash
         if (this.hitFlash > 0) {
             this.hitFlash = Math.max(0, this.hitFlash - dt * 5);
         }

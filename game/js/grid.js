@@ -40,14 +40,19 @@ export function generateGrid(data, canvasWidth, canvasHeight, options = {}) {
     const cols = data[0]?.length || 0;
     if (rows === 0 || cols === 0) return { bricks, spatialGrid: [], gridInfo: {} };
 
-    // Force exact GitHub-style dimensions
-    const brickSize = 11;
     const brickGap = 2; 
-    const brickWidth = brickSize;
-    const brickHeight = brickSize;
+    
+    // Dynamically calculate brick width to fill the screen nicely
+    const sidePadding = Math.max(20, canvasWidth * 0.05); // Minimum 20px, scales with screen
+    const availableWidth = canvasWidth - (sidePadding * 2);
+    
+    let brickWidth = Math.floor((availableWidth - (cols - 1) * brickGap) / cols);
+    // Keep proportions sane (not too small on mobile, not massive on 4k)
+    brickWidth = Math.max(6, Math.min(brickWidth, 22)); 
+    const brickHeight = brickWidth;
     
     // Center the grid horizontally
-    const totalWidth = cols * brickSize + (cols - 1) * brickGap;
+    const totalWidth = cols * brickWidth + (cols - 1) * brickGap;
     const startX = (canvasWidth - totalWidth) / 2;
     const startY = topPadding;
 
@@ -63,7 +68,6 @@ export function generateGrid(data, canvasWidth, canvasHeight, options = {}) {
             const x = startX + col * (brickWidth + brickGap);
             const y = startY + row * (brickHeight + brickGap);
 
-            // Extract metadata if available
             const meta = metadata?.[row]?.[col] || null;
 
             const brick = new Brick(x, y, brickWidth, brickHeight, hp, meta);
