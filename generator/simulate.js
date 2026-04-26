@@ -1,7 +1,7 @@
 export function simulate(grids, options = {}) {
     let {
-        height = 140, 
-        framesPerLevel = 2500, // Increased to account for slow speed
+        height = 110, // Reduced widget height
+        framesPerLevel = 2000, 
         fps = 30,
     } = options;
 
@@ -11,8 +11,8 @@ export function simulate(grids, options = {}) {
 
     const brickW = 5;
     const brickGap = 1.5;
-    const topPaddingBase = 15; 
-    const ballR = 1.5;
+    const topPaddingBase = 12; // Reduced top padding
+    const ballR = 1.2; // Tiny ball
 
     const sidePadding = 20; 
     const gridWidth = cols * brickW + (cols - 1) * brickGap;
@@ -27,10 +27,10 @@ export function simulate(grids, options = {}) {
     let totalScore = 0;
 
     let ballX = width / 2;
-    let ballY = height - 40;
+    let ballY = height - 35;
     let paddleW = 30; 
-    const paddleH = 4;
-    const paddleY = height - 10; 
+    const paddleH = 2; // Sleek line paddle
+    const paddleY = height - 8; 
     let paddleX = ballX - paddleW / 2;
 
     for (let seqIndex = 0; seqIndex < levelSequence.length; seqIndex++) {
@@ -50,6 +50,7 @@ export function simulate(grids, options = {}) {
                         y: topPadding + r * (brickW + brickGap),
                         w: brickW, h: brickW,
                         hp, maxHp: hp, alive: true,
+                        damageFrames: [] // Track damage for cracks
                     });
                 }
             }
@@ -58,26 +59,24 @@ export function simulate(grids, options = {}) {
         const totalBricks = bricks.length;
         let bricksDestroyed = 0;
         
-        // Drastically reduced speed
-        let baseSpeed = 50; 
+        let baseSpeed = 80; // Slightly increased
         let speed = baseSpeed;
         let angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.4;
         let ballDx = Math.cos(angle) * speed;
         let ballDy = Math.sin(angle) * speed;
 
-        const maxFrames = 6000; // Allows plenty of time for the slow ball to clear the board
+        const maxFrames = 4500; 
 
         for (let frame = 0; frame < maxFrames; frame++) {
             let frameBounced = false; 
             
-            // Escalating damage so heavy bricks eventually break
             let damage = 1;
-            if (frame > 2000) damage = 2;
-            if (frame > 3000) damage = 4;
-            if (frame > 4000) damage = 100;
+            if (frame > 1500) damage = 2;
+            if (frame > 2500) damage = 4;
+            if (frame > 3500) damage = 100;
 
-            if (frame > 2500) speed = baseSpeed * 1.5;
-            if (frame > 4000) speed = baseSpeed * 2.5;
+            if (frame > 1500) speed = baseSpeed * 1.5;
+            if (frame > 3000) speed = baseSpeed * 2.5;
 
             const steps = Math.ceil(speed * dt / (brickW * 0.5));
             const subDt = dt / steps;
@@ -122,6 +121,7 @@ export function simulate(grids, options = {}) {
                         }
 
                         brick.hp -= damage;
+                        brick.damageFrames.push(frames.length); // Record exact hit frame
                         totalScore += 10;
                         frameBounced = true;
 

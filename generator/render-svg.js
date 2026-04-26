@@ -29,9 +29,9 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
     const duration = frames.length / fps;
     const totalFrames = frames.length - 1;
 
-    const ballR = 1.5; 
-    const paddleH = 4; 
-    const paddleY = height - 10;
+    const ballR = 1.2; 
+    const paddleH = 2; 
+    const paddleY = height - 8;
 
     const ballKeyframes = [];
     for (let i = 0; i < frames.length; i++) {
@@ -71,25 +71,43 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
     svg += `.ball { animation: ballMove ${duration}s linear infinite; }\n`;
     svg += `.paddle { animation: paddleMove ${duration}s linear infinite; }\n`;
 
-    // Disappearing "Pop" Brick Animations
+    // Brick State Animations (Disappear instantly & Cracks)
     for (const brick of finalBricks) {
         if (brick.deathFrame !== undefined) {
             const animName = `b_${brick.id.replace(/-/g, '_')}`;
             const pct = ((brick.deathFrame / totalFrames) * 100).toFixed(2);
-            // Gives it a little explosion scale right as it dies
-            const popPct = Math.min(100, parseFloat(pct) + 1.5).toFixed(2);
-            
             svg += `@keyframes ${animName} { 
-                0%, ${pct}% { opacity: 1; transform: scale(1); } 
-                ${popPct}% { opacity: 0; transform: scale(1.4); } 
-                100% { opacity: 0; transform: scale(1.4); } 
+                0%, ${pct}% { opacity: 1; } 
+                ${Math.min(100, parseFloat(pct) + 0.01)}%, 100% { opacity: 0; } 
             }\n`;
-            
-            // transform-origin strictly bound to the center of the individual brick
-            svg += `.brick-${brick.id} { 
-                animation: ${animName} ${duration}s linear infinite; 
-                transform-origin: ${brick.x + brickW/2}px ${brick.y + brickH/2}px;
-            }\n`;
+            svg += `.brick-${brick.id} { animation: ${animName} ${duration}s linear infinite; }\n`;
+        }
+
+        // Damage Cracks Activation
+        if (brick.maxHp > 1 && brick.damageFrames?.length > 0) {
+            if (brick.damageFrames.length >= 1) {
+                const c1Anim = `c1_${brick.id.replace(/-/g, '_')}`;
+                const dmgPct = ((brick.damageFrames[0] / totalFrames) * 100).toFixed(2);
+                const deathPct = brick.deathFrame ? ((brick.deathFrame / totalFrames) * 100).toFixed(2) : 100;
+                svg += `@keyframes ${c1Anim} {
+                    0%, ${dmgPct}% { opacity: 0; }
+                    ${Math.min(100, parseFloat(dmgPct) + 0.01)}%, ${deathPct}% { opacity: 1; }
+                    ${Math.min(100, parseFloat(deathPct) + 0.01)}%, 100% { opacity: 0; }
+                }\n`;
+                svg += `.c1-${brick.id} { animation: ${c1Anim} ${duration}s linear infinite; opacity: 0; }\n`;
+            }
+
+            if (brick.damageFrames.length >= 2) {
+                const c2Anim = `c2_${brick.id.replace(/-/g, '_')}`;
+                const dmgPct = ((brick.damageFrames[1] / totalFrames) * 100).toFixed(2);
+                const deathPct = brick.deathFrame ? ((brick.deathFrame / totalFrames) * 100).toFixed(2) : 100;
+                svg += `@keyframes ${c2Anim} {
+                    0%, ${dmgPct}% { opacity: 0; }
+                    ${Math.min(100, parseFloat(dmgPct) + 0.01)}%, ${deathPct}% { opacity: 1; }
+                    ${Math.min(100, parseFloat(deathPct) + 0.01)}%, 100% { opacity: 0; }
+                }\n`;
+                svg += `.c2-${brick.id} { animation: ${c2Anim} ${duration}s linear infinite; opacity: 0; }\n`;
+            }
         }
     }
 
@@ -109,18 +127,35 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
     const currentYear = new Date().getFullYear();
     const watermarkX = startX + gridWidth / 2;
     const watermarkY = topPaddingBase + gridHeight / 2;
+    // Mathematically scales the font so it fits strictly within the grid area
+    const fontSize = Math.floor(gridHeight * 1.4); 
     
-    svg += `<text x="${watermarkX}" y="${watermarkY}" dominant-baseline="central" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="90" font-weight="900" text-anchor="middle" fill="${watermarkColor}" style="pointer-events: none; user-select: none;">${currentYear}</text>\n`;
+    svg += `<text x="${watermarkX}" y="${watermarkY}" dominant-baseline="central" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="${fontSize}" font-weight="900" text-anchor="middle" fill="${watermarkColor}" style="pointer-events: none; user-select: none;">${currentYear}</text>\n`;
 
     // Render Bricks
     for (const brick of finalBricks) {
         const color = t.palette[Math.min(brick.maxHp, 4)];
         const cls = brick.deathFrame !== undefined ? `brick-${brick.id}` : '';
         svg += `<rect class="${cls}" x="${brick.x}" y="${brick.y}" width="${brickW}" height="${brickH}" rx="1.5" fill="${color}"/>\n`;
+
+        // Render Cracks
+        if (brick.maxHp > 1) {
+            const cx = brick.x + brickW * 0.5;
+            const cy = brick.y + brickH * 0.5;
+            const dmgColor = `rgba(0,0,0,0.5)`; 
+            
+            const c1_cls = `c1-${brick.id}`;
+            svg += `<path class="${c1_cls}" d="M ${cx} ${cy} L ${cx + brickW * 0.3} ${cy - brickH * 0.35}" stroke="${dmgColor}" stroke-width="0.7" fill="none" />\n`;
+            
+            if (brick.maxHp > 2) {
+                const c2_cls = `c2-${brick.id}`;
+                svg += `<path class="${c2_cls}" d="M ${cx} ${cy} L ${cx - brickW * 0.25} ${cy + brickH * 0.3}" stroke="${dmgColor}" stroke-width="0.7" fill="none" />\n`;
+            }
+        }
     }
 
     // Render Paddle
-    svg += `<rect class="paddle" x="${frames[0].paddleX}" y="${paddleY}" width="${frames[0].paddleW}" height="${paddleH}" rx="2" fill="${t.paddle}"/>\n`;
+    svg += `<rect class="paddle" x="${frames[0].paddleX}" y="${paddleY}" width="${frames[0].paddleW}" height="${paddleH}" rx="1" fill="${t.paddle}"/>\n`;
     
     // Render Main Ball
     svg += `<circle class="ball" cx="${frames[0].ballX}" cy="${frames[0].ballY}" r="${ballR}" fill="${t.ball}"/>\n`;
