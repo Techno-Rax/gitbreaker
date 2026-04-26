@@ -78,9 +78,8 @@ export async function fetchContributions(username, token = process.env.GITHUB_TO
                 grid: weeksToGrid(calendar.weeks)
             });
         } else {
-             // Stop fetching older years if a full year is entirely empty (likely beyond account creation)
-             // Actually, some users have gap years. We'll include it if it's empty but limit arrays.
-             break;
+             // Continue fetching older years even if one is empty
+             continue;
         }
     }
 

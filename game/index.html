@@ -88,20 +88,7 @@
                         <option value="outrun">Outrun</option>
                     </select>
 
-                    <label style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">2. Choose Size</label>
-                    <select id="export-size" style="width: 100%; padding: 8px; margin-top: 5px; margin-bottom: 12px; background: #0d1117; color: white; border: 1px solid #30363d; border-radius: 4px;">
-                        <option value="full">Full Width (README)</option>
-                        <option value="half" selected>Half Width</option>
-                        <option value="compact">Compact</option>
-                        <option value="custom">Custom</option>
-                    </select>
-
-                    <div id="export-custom-size" class="hidden" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
-                        <input id="export-width" type="number" min="640" max="1600" value="960" placeholder="Width" style="width: 100%; padding: 8px; background: #0d1117; color: white; border: 1px solid #30363d; border-radius: 4px;">
-                        <input id="export-height" type="number" min="140" max="320" value="170" placeholder="Height" style="width: 100%; padding: 8px; background: #0d1117; color: white; border: 1px solid #30363d; border-radius: 4px;">
-                    </div>
-
-                    <label style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">3. Markdown Snippet</label>
+                    <label style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">2. Markdown Snippet</label>
                     <textarea id="export-code" readonly style="width: 100%; height: 80px; padding: 10px; margin-top: 5px; margin-bottom: 20px; background: #010409; color: #58a6ff; font-family: monospace; border: 1px solid #30363d; border-radius: 4px; resize: none;"></textarea>
                     
                     <div style="display: flex; gap: 10px;">

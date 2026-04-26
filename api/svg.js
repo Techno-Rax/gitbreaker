@@ -2,28 +2,10 @@ import { fetchContributions, generateDemoGrid } from '../generator/fetch-contrib
 import { simulate } from '../generator/simulate.js';
 import { renderSVG } from '../generator/render-svg.js';
 
-const SIZE_PRESETS = {
-    full: { width: 1200, height: 190, sidePadding: 36 },
-    half: { width: 800, height: 170, sidePadding: 28 },
-    compact: { width: 680, height: 160, sidePadding: 20 },
-};
-
-function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, value));
-}
-
-function parseNumber(value, fallback) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 function resolveDimensions(query) {
-    const presetName = typeof query.size === 'string' ? query.size.toLowerCase() : 'half';
-    const preset = SIZE_PRESETS[presetName] || SIZE_PRESETS.half;
-
-    const width = Math.round(clamp(parseNumber(query.width, preset.width), 640, 1600));
-    const height = Math.round(clamp(parseNumber(query.height, preset.height), 140, 320));
-    const sidePadding = Math.round(clamp(parseNumber(query.sidePadding, preset.sidePadding), 0, 100));
+    const width = 720;
+    const height = 170;
+    const sidePadding = 20;
     const watermarkOpacity = clamp(parseNumber(query.watermarkOpacity, NaN), 0.04, 0.35);
 
     return {
@@ -31,7 +13,7 @@ function resolveDimensions(query) {
         height,
         sidePadding,
         watermarkOpacity: Number.isFinite(watermarkOpacity) ? watermarkOpacity : undefined,
-        compact: presetName === 'compact' || query.compact === 'true',
+        compact: false,
     };
 }
 
@@ -54,7 +36,7 @@ export default async function handler(req, res) {
             width: dimensions.width,
             height: dimensions.height,
             sidePadding: dimensions.sidePadding,
-            framesPerLevel: 120 
+            framesPerLevel: 800 
         });
 
         const svgString = renderSVG(simResult, dimensions.width, dimensions.height, grids, {
@@ -76,7 +58,7 @@ export default async function handler(req, res) {
             width: dimensions.width,
             height: dimensions.height,
             sidePadding: dimensions.sidePadding,
-            framesPerLevel: 120,
+            framesPerLevel: 800,
         });
         const svgString = renderSVG(simResult, dimensions.width, dimensions.height, grids, {
             username: 'Error - Demo',

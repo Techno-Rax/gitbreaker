@@ -169,7 +169,7 @@ export function renderSVG(simResult, width, height, grids, options = {}) {
         // We didn't pass the actual 'year' strings to renderSVG. Let's just calculate it: Since max is 5, it's roughly currentYear - gridIndex.
         const currentY = new Date().getFullYear();
         const yearText = currentY - gridIndex;
-        svg += `    <text x="${width/2}" y="${height/2 + yearFontSize * 0.25}" font-family="sans-serif" font-size="${yearFontSize}" font-weight="800" text-anchor="middle" fill="${watermarkFill}" style="pointer-events: none;">${yearText}</text>\n`;
+        svg += `    <text x="${width/2}" y="${height/2}" dominant-baseline="middle" font-family="sans-serif" font-size="${yearFontSize}" font-weight="800" text-anchor="middle" fill="${watermarkFill}" style="pointer-events: none;">${yearText}</text>\n`;
 
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {

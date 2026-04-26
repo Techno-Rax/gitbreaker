@@ -149,27 +149,14 @@ class Game {
         // --- Export Feature ---
         const updateExportCode = () => {
             const theme = document.getElementById('export-theme').value;
-            const size = document.getElementById('export-size').value;
-            const customSizeContainer = document.getElementById('export-custom-size');
-            const widthInput = document.getElementById('export-width');
-            const heightInput = document.getElementById('export-height');
             const domain = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
                 ? 'https://gitbreaker.vercel.app' 
                 : window.location.origin;
             const user = this.username && this.username !== 'demo' ? this.username : 'techno-rax';
 
             let query = `user=${encodeURIComponent(user)}&theme=${encodeURIComponent(theme)}`;
-            if (size === 'custom') {
-                customSizeContainer.classList.remove('hidden');
-                const width = Math.min(1600, Math.max(640, parseInt(widthInput.value, 10) || 960));
-                const height = Math.min(320, Math.max(140, parseInt(heightInput.value, 10) || 170));
-                query += `&width=${width}&height=${height}`;
-            } else {
-                customSizeContainer.classList.add('hidden');
-                query += `&size=${encodeURIComponent(size)}`;
-            }
 
-            const code = `[![CommitBreaker](${domain}/api/svg?${query})](https://techno-rax.github.io/gitbreaker/)`;
+            const code = `[![CommitBreaker](${domain}/api/svg?${query})](${domain})`;
             document.getElementById('export-code').value = code;
         };
 
@@ -183,9 +170,6 @@ class Game {
         });
 
         document.getElementById('export-theme')?.addEventListener('change', updateExportCode);
-        document.getElementById('export-size')?.addEventListener('change', updateExportCode);
-        document.getElementById('export-width')?.addEventListener('input', updateExportCode);
-        document.getElementById('export-height')?.addEventListener('input', updateExportCode);
 
         document.getElementById('copy-export-btn')?.addEventListener('click', () => {
             const codeEl = document.getElementById('export-code');
@@ -553,8 +537,8 @@ class Game {
 
         let actualSpeed = dropSpeedBase;
         // Soft Floor: slow down when getting close to paddle
-        if (closestDist < 120) {
-            actualSpeed *= Math.max(0.05, (closestDist - 10) / 110);
+        if (closestDist < 250) {
+            actualSpeed *= Math.max(0.0, (closestDist - 150) / 100);
         }
 
         const dy = actualSpeed * this.gravityDir * dt;

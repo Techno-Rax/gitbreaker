@@ -13,7 +13,7 @@ export class Ball {
         this.x = x;
         this.y = y;
         this.radius = radius;
-        this.baseSpeed = 380;
+        this.baseSpeed = 280;
         this.speed = this.baseSpeed;
         this.dx = 0;
         this.dy = 0;
@@ -142,7 +142,7 @@ export class Ball {
     /** Speed up after brick destruction */
     onBrickDestroyed() {
         this.bricksDestroyed++;
-        this.speedMultiplier = Math.min(1.8, 1 + Math.floor(this.bricksDestroyed / 10) * 0.03);
+        this.speedMultiplier = Math.min(1.5, 1 + Math.floor(this.bricksDestroyed / 20) * 0.02);
     }
 
     /**
